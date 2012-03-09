@@ -1,7 +1,0 @@
-#!/usr/bin/bash
-killall runWsTestSingle.sh; 
-
-killall java
-
-sleep 2; 
-ps -ef | grep java

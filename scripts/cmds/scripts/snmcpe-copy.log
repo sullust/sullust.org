@@ -1,2 +1,0 @@
-/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd01-snmcpeb1.mso.mci.com "cd /esp; /home/esp/scripts/SNMCPE-Instance-Copy.sh 1105 1107"
-(ndcd01-snmcpeb1.mso.mci.com):  snmcpe_prod_1105 -> snmcpe_prod_1107

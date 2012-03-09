@@ -1,7 +1,0 @@
-Thu Mar  1 14:08:54 EST 2012: Opening socket to lpfsacvtd01.ebiz.verizon.com:1521 - Entering read.
-Thu Mar  1 14:09:54 EST 2012: Socket to lpfsacvtd01.ebiz.verizon.com:1521 closed
-Thu Mar 1 14:22:41 EST 2012 - Connecting to lpfsaczta01.ebiz.verizon.com:22
-Killed by signal 15.
-Couldn't connect to : : IO::Socket::INET: Cannot determine remote port
-Thu Mar 1 14:43:22 EST 2012 - Connecting to lpfsaczta01.ebiz.verizon.com:22
-Killed by signal 15.
