@@ -1,0 +1,2 @@
+#!/usr/bin/bash
+zenity --info --text="`host \`zenity --entry --text=\"Enter the name/ip\"\``"

@@ -1,0 +1,9 @@
+Mon May  9 22:52:01 EDT 2011
+VPN Running
+/home/jainswor/scripts/startup/startNetworkTools.sh: line 68: Running network startup: Mon May  9 22:52:01 EDT 2011: command not found
+
+(gksudo:3865): Gtk-WARNING **: cannot open display: 
+
+(gksudo:3866): Gtk-WARNING **: cannot open display: 
+
+(gksudo:3867): Gtk-WARNING **: cannot open display: 

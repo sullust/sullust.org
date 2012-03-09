@@ -1,0 +1,96 @@
+TOOLS_SERVER=pdcc01-espws1.mso.mci.com:8880
+TOOLS_TRANSPORT=https
+
+##### Saat Script Location ###############
+
+
+
+PINGTEST_LOCATION = /esp/snmcpe/scripts/pingInterfaces.sh
+#PINGTEST_LOCATION for saatTools diagnostics, Windows OS = C:\\WINNT\\system32\\cmd.exe /C ping -n 1
+##### End of Saat Script Location ########
+
+
+### CCM/Nortel expect scripts
+EXPECT_LOCATION_CCM=/esp/snmcpe/scripts/ccm5_commandline.exp
+EXPECT_LOCATION_NORTEL=/esp/snmcpe/scripts/nortel_commandline.exp
+
+### ISR/CE expect script and location
+EXPECT_LOCATION_ISRCE=/esp/snmcpe/scripts/IsrCe_RunCommand.exp
+EXPECT_LOCATION_ISRCEDIR=/esp/snmcpe/scripts/
+
+
+
+########## CDR Collection ##########
+CDR_DIRECTORY = /esp/snmcpe/cdr/new
+CDR_USERID = snmcpedr
+CDR_PASSWORD = 44OQ9zgm
+CME_DIRECTORY = /esp/snmcpe/cmerecords/new
+DELETE_FILE = /esp/snmcpe/scripts/deleteFile.sh
+
+
+CCMTransport = https
+CCMAxlPort = 8443
+########## CDR Collection ##########
+
+
+########## SAAT PHASE_II ##########
+TFTP_HOME_LOCATION =/tftpboot
+###################################
+
+
+############## INFO_STATUS ##############
+TASK_TIMES_SAAT2 = 95000;4000
+TASK_TIMES_DEVICEQUERY = 10000
+############## INFO_STATUS ##############
+
+############## AIM ##############
+DOMAIN_AIM_TEST_MODE = false
+############## AIM ##############
+
+############## SNMP_CONNECTION_PROPERTIES ##############
+SNMP_CONNECTION_TIMEOUT = 5000
+SNMP_CONNECTION_RETRIES = 2
+
+SNMPTRAPDESTINATION=146.170.56.135
+
+
+########################################################
+
+############### RLOGIN CONNECTION PROPERTIES ###########
+RLOGIN_CONNECTION_TIMEOUT = 30000
+########################################################
+
+
+
+
+
+
+########################################################
+### CCM Running Services
+CCM_SHOULD_RUN = snmp_master_age,hostagt,host_agent.pl,mib2agt,mib2_agent.pl,naaagt,sappagt,sapp_agent.pl,ccmAgt,CiscoSyslogSubA,cdpAgt
+
+
+
+################## REMOVE TACACS SCRIPT (SAAT, only used if set) ##################
+#REMOVE_TACACS_SCRIPT_LINES = 6
+#REMOVE_TACACS_SCRIPT_1 = aaa accounting commands 15
+#REMOVE_TACACS_SCRIPT_2 = aaa authorization commands 15
+#REMOVE_TACACS_SCRIPT_3 = aaa authentication login default
+#REMOVE_TACACS_SCRIPT_4 = aaa new model
+#REMOVE_TACACS_SCRIPT_5 = tacacs-server
+#REMOVE_TACACS_SCRIPT_6 = username GNOuser
+####################################################################################
+
+########## IosVersion class PATTERNS (SAAT,only used if set) ##############
+#CISCO_IOS_VERSION_PATTERN = .*Version\\s+(\\d+)\\.(\\d+)\\s*\\(([^\\)]+)\\)([^\\s\\p{Punct}]*).*
+#CISCO_IOS_VERSION_PATTERN_SIMPLE = .*Version\\s+(\\d+\\.\\d+\\s*\\([^\\)]+\\)[^\\s\\p{Punct}]*).*
+#INDIVIDUAL_RELEASE_NUMBER_PATTERN = [^\\d]*(\\d+)[^\\d]*.*
+###########################################################################
+
+#Voyence Web Service End Point
+
+
+
+EXTENDED_PINGTEST_LOCATION = /esp/snmcpe/scripts/extendedPingTest.pl
+NEW_TRAP_SENDER_DESTINATION=146.170.56.135
+CVPING_LOCATION = /esp/snmcpe/scripts

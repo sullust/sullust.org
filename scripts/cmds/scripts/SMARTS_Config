@@ -1,0 +1,1712 @@
+#!/bin/ksh
+#
+# Doug Williams   11-20-03
+#
+# MODIFICATION LOG:
+# 	J.Byzek 2004/10/19 - add D14 per Doug's mods, rework D15 for Ken.
+#	J.Byzek	2004/10/27 - move d14 to Production SAMs, include cnh boxes
+#                            for d14.
+#       dwilliam 04/20/06  - Modified to add VOIP variables, as well as 
+#                            changes in determining ARCHIVE_INCL which now needs
+#                            to include VOIP's, as well as AM (IC) servers
+#                            (for copy_rps/copy_changes/am2_backup).  Also
+#                            fixed some code to eliminate duplicate servers in
+#                            variables.  Eliminated MULTI_DOMAIN variable, used
+#                            when we transitioned to multi-domain (smarts 
+#                            domains) per server.  All management domains should
+#                            be smarts multi-domain now.
+#       A.Shah  2007/06/11 - add domain8 servers.
+#       A.Shah  2008/08/15 - Revise for MPLS Manager
+#       A.Shah  2008/10/15 - Revise for NPM
+#       A.Shah  2009/05/01 - Revise for ACM
+#       dlh   2010/09/07   - Added ALL_DNS_SERVERS env var
+#                          - Adding PRIMARY_FLAG based on server/proc order
+#	dlh	2011/01/28 - adding snmcpe DM instances
+
+### Variables defining location of some common system commands first
+
+#set -x
+
+##
+
+HOSTNAME=/usr/bin/hostname
+GREP=/usr/bin/grep
+EGREP=/usr/bin/egrep
+AWK=/usr/bin/awk
+SED=/usr/bin/sed
+PERL=/usr/local/bin/perl
+CAT=/usr/bin/cat
+
+### Set the customer domain numbers
+
+
+set -A DOMAINS 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21 22 23 24 25 26 27 28 30 31 32 33 34 35 39 456 457 458 459 460 461 462 463 464 465 466 467 511 512 516 522 523 552 553 560 561 562 563 564 565 566 567
+
+### Set those domains that have multi-server SMARTS architecture/scripts deployed
+
+# SAMs and/or XDIPIPs, AMs and/or MPLSs and/or BGPs and/or OSPFs and/or ACMs, OIs, PMs, SISs, Concords, SNMCPEs, DMs, VOIPs, 
+# IV's, IVDs (InfoVista Discovery), CP's, VM's, Portals
+#
+# Each group of the same type (SAM. AM, OI, PM) is separated 
+# by spaces, and group of a same type is separated from another
+# type by commas.
+# Ordering should be from lowest to highest numbered type, 
+# i.e.: am1 am2 am3 ...
+# A primary type should be follwed by it's redundant counterpart, i.e., 
+# pdcd15-ic4:<DM_NAME>@9605 ndcd15-icb4:<DM_NAME>@9605 ... ...
+# To specify a process name (DMNAME) and port number for
+# a server, use a colon ":" at the end of servername,
+# followed by the process, then a "@" followe by port.
+# Multiples can be specified by separating each "process@port" by
+# colons.
+# Ex: crytd4-am1:<DM_NAME>@9605:<DM_NAME>@9607:<DM_NAME>@9609
+####
+# PRODUCTION ENVIRONMENT
+####
+DOMAIN[1]='pdcd01-sam1:pdcd01-sam1-sam1@9005 ndcd01-samb1:ndcd01-samb1-sam1@9005 pdcd01-sam1:pdcd01-sam1-xda1@9097 ndcd01-samb1:ndcd01-samb1-xda1@9097, pdcd01-ic3:pdcd01-ic3-am1@9011:pdcd01-ic3-am2@9012:pdcd01-ic3-am3@9013:pdcd01-ic3-am4@9014 ndcd01-icb3:ndcd01-icb3-am1@9011:ndcd01-icb3-am2@9012:ndcd01-icb3-am3@9013:ndcd01-icb3-am4@9014 pdcd01-ic2:pdcd01-ic2-bgp1@9087:pdcd01-ic2-ospf1@9092 ndcd01-icb2:ndcd01-icb2-bgp1@9087:ndcd01-icb2-ospf1@9092, pdcd01-ic2:pdcd01-ic2-oi1@9006 ndcd01-icb2:ndcd01-icb2-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd01-cnhca1:, pdcd01-snmcpe1:pdcd01-snmcpe1-syslog1@9036 ndcd01-snmcpeb1:ndcd01-snmcpeb1-syslog1@9036, pdcd01-snmcpe1:pdcd01-snmcpe1-dm1@9026:pdcd01-snmcpe1-bgpdm1@9027:pdcd01-snmcpe1-ospfdm1@9028 ndcd01-snmcpeb1:ndcd01-snmcpeb1-dm1@9026:ndcd01-snmcpeb1-bgpdm1@9027:ndcd01-snmcpeb1-ospfdm1@9028, pdcd01-ic2:pdcd01-ic2-voip1@9041 ndcd01-icb2:ndcd01-icb2-voip1@9041'
+DOMAIN[2]='pdcd02-sam1:pdcd02-sam1-sam1@9005 ndcd02-samb1:ndcd02-samb1-sam1@9005 pdcd02-sam1:pdcd02-sam1-xda1@9097 ndcd02-samb1:ndcd02-samb1-xda1@9097, pdcd02-ic2:pdcd02-ic2-am1@9011:pdcd02-ic2-am2@9012:pdcd02-ic2-am3@9013:pdcd02-ic2-am4@9014 ndcd02-icb2:ndcd02-icb2-am1@9011:ndcd02-icb2-am2@9012:ndcd02-icb2-am3@9013:ndcd02-icb2-am4@9014 pdcd02-ic1:pdcd02-ic1-bgp1@9087:pdcd02-ic1-ospf1@9092 ndcd02-icb1:ndcd02-icb1-bgp1@9087:ndcd02-icb1-ospf1@9092, pdcd02-ic1:pdcd02-ic1-oi1@9006 ndcd02-icb1:ndcd02-icb1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd02-cnhca1:, pdcd02-snmcpe1:pdcd02-snmcpe1-syslog1@9036 ndcd02-snmcpeb1:ndcd02-snmcpeb1-syslog1@9036, pdcd02-snmcpe1:pdcd02-snmcpe1-dm1@9026:pdcd02-snmcpe1-bgpdm1@9027:pdcd02-snmcpe1-ospfdm1@9028 ndcd02-snmcpeb1:ndcd02-snmcpeb1-dm1@9026:ndcd02-snmcpeb1-bgpdm1@9027:ndcd02-snmcpeb1-ospfdm1@9028, pdcd02-ic1:pdcd02-ic1-voip1@9041 ndcd02-icb1:ndcd02-icb1-voip1@9041'
+DOMAIN[3]='pdcd03-sam1:pdcd03-sam1-sam1@9005 ndcd03-samb1:ndcd03-samb1-sam1@9005 pdcd03-sam1:pdcd03-sam1-xda1@9097 ndcd03-samb1:ndcd03-samb1-xda1@9097, pdcd03-ic3:pdcd03-ic3-am1@9011:pdcd03-ic3-am2@9012:pdcd03-ic3-am3@9013:pdcd03-ic3-am4@9014 ndcd03-icb3:ndcd03-icb3-am1@9011:ndcd03-icb3-am2@9012:ndcd03-icb3-am3@9013:ndcd03-icb3-am4@9014 pdcd03-ic2:pdcd03-ic2-bgp1@9087:pdcd03-ic2-ospf1@9092 ndcd03-icb2:ndcd03-icb2-bgp1@9087:ndcd03-icb2-ospf1@9092 pdcd03-ic2:pdcd03-ic2-esm1@9076 ndcd03-icb2:ndcd03-icb2-esm1@9076, pdcd03-ic2:pdcd03-ic2-oi1@9006 ndcd03-icb2:ndcd03-icb2-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd03-cnhca1:, pdcd03-snmcpe1:pdcd03-snmcpe1-syslog1@9036 ndcd03-snmcpeb1:ndcd03-snmcpeb1-syslog1@9036, pdcd03-snmcpe1:pdcd03-snmcpe1-dm1@9026:pdcd03-snmcpe1-bgpdm1@9027:pdcd03-snmcpe1-ospfdm1@9028 ndcd03-snmcpeb1:ndcd03-snmcpeb1-dm1@9026:ndcd03-snmcpeb1-bgpdm1@9027:ndcd03-snmcpeb1-ospfdm1@9028, pdcd03-ic2:pdcd03-ic2-voip1@9041 ndcd03-icb2:ndcd03-icb2-voip1@9041'
+DOMAIN[4]='pdcd04-sam1:pdcd04-sam1-sam1@9005 ndcd04-samb1:ndcd04-samb1-sam1@9005 pdcd04-sam1:pdcd04-sam1-xda1@9097 ndcd04-samb1:ndcd04-samb1-xda1@9097, pdcd04-ic3:pdcd04-ic3-am1@9011:pdcd04-ic3-am2@9012:pdcd04-ic3-am3@9013:pdcd04-ic3-am4@9014 ndcd04-icb3:ndcd04-icb3-am1@9011:ndcd04-icb3-am2@9012:ndcd04-icb3-am3@9013:ndcd04-icb3-am4@9014 pdcd04-ic2:pdcd04-ic2-bgp1@9087:pdcd04-ic2-ospf1@9092 ndcd04-icb2:ndcd04-icb2-bgp1@9087:ndcd04-icb2-ospf1@9092, pdcd04-ic2:pdcd04-ic2-oi1@9006 ndcd04-icb2:ndcd04-icb2-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd04-cnhca1:, pdcd04-snmcpe1:pdcd04-snmcpe1-syslog1@9036 ndcd04-snmcpeb1:ndcd04-snmcpeb1-syslog1@9036, pdcd04-snmcpe1:pdcd04-snmcpe1-dm1@9026:pdcd04-snmcpe1-bgpdm1@9027:pdcd04-snmcpe1-ospfdm1@9028 ndcd04-snmcpeb1:ndcd04-snmcpeb1-dm1@9026:ndcd04-snmcpeb1-bgpdm1@9027:ndcd04-snmcpeb1-ospfdm1@9028, pdcd04-ic2:pdcd04-ic2-voip1@9041 ndcd04-icb2:ndcd04-icb2-voip1@9041'
+DOMAIN[5]='pdcc01-sam5:pdcc01-sam5-sam1@9005 ndcc01-samb5:ndcc01-samb5-sam1@9005 pdcc01-sam5:pdcc01-sam5-xda1@9097 ndcc01-samb5:ndcc01-samb5-xda1@9097, pdcd05-ic3:pdcd05-ic3-am1@9011:pdcd05-ic3-am2@9012:pdcd05-ic3-am3@9013:pdcd05-ic3-am4@9014 ndcd05-icb3:ndcd05-icb3-am1@9011:ndcd05-icb3-am2@9012:ndcd05-icb3-am3@9013:ndcd05-icb3-am4@9014 pdcd05-ic2:pdcd05-ic2-bgp1@9087:pdcd05-ic2-ospf1@9092 ndcd05-icb2:ndcd05-icb2-bgp1@9087:ndcd05-icb2-ospf1@9092, pdcd05-ic2:pdcd05-ic2-oi1@9006 ndcd05-icb2:ndcd05-icb2-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd05-cnhca1:, pdcd05-snmcpe1:pdcd05-snmcpe1-syslog1@9036 ndcd05-snmcpeb1:ndcd05-snmcpeb1-syslog1@9036, pdcd05-snmcpe1:pdcd05-snmcpe1-dm1@9026:pdcd05-snmcpe1-bgpdm1@9027:pdcd05-snmcpe1-ospfdm1@9028 ndcd05-snmcpeb1:ndcd05-snmcpeb1-dm1@9026:ndcd05-snmcpeb1-bgpdm1@9027:ndcd05-snmcpeb1-ospfdm1@9028, pdcd05-ic2:pdcd05-ic2-voip1@9041 ndcd05-icb2:ndcd05-icb2-voip1@9041'
+DOMAIN[6]='pdcd06-sam1:pdcd06-sam1-sam1@9005 ndcd06-samb1:ndcd06-samb1-sam1@9005 pdcd06-sam1:pdcd06-sam1-xda1@9097 ndcd06-samb1:ndcd06-samb1-xda1@9097, pdcd06-ic1:pdcd06-ic1-am1@9011:pdcd06-ic1-am2@9012 ndcd06-icb1:ndcd06-icb1-am1@9011:ndcd06-icb1-am2@9012 pdcd06-ic3:pdcd06-ic3-am1@9011:pdcd06-ic3-am2@9012 ndcd06-icb3:ndcd06-icb3-am1@9011:ndcd06-icb3-am2@9012 pdcd06-as1:pdcd06-as1-am1@9011 pdcd06-ic2:pdcd06-ic2-bgp1@9087:pdcd06-ic2-ospf1@9092 ndcd06-icb2:ndcd06-icb2-bgp1@9087:ndcd06-icb2-ospf1@9092, pdcd06-ic2:pdcd06-ic2-oi1@9006 ndcd06-icb2:ndcd06-icb2-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd06-cnhca1:, pdcd06-snmcpe1:pdcd06-snmcpe1-syslog1@9036 ndcd06-snmcpeb1:ndcd06-snmcpeb1-syslog1@9036, pdcd06-snmcpe1:pdcd06-snmcpe1-dm1@9026:pdcd06-snmcpe1-bgpdm1@9027:pdcd06-snmcpe1-ospfdm1@9028 ndcd06-snmcpeb1:ndcd06-snmcpeb1-dm1@9026:ndcd06-snmcpeb1-bgpdm1@9027:ndcd06-snmcpeb1-ospfdm1@9028, pdcd06-ic2:pdcd06-ic2-voip1@9041 ndcd06-icb2:ndcd06-icb2-voip1@9041'
+DOMAIN[7]='pdcd07-sam1:pdcd07-sam1-sam1@9005 ndcd07-samb1:ndcd07-samb1-sam1@9005 pdcd07-sam1:pdcd07-sam1-xda1@9097 ndcd07-samb1:ndcd07-samb1-xda1@9097, pdcd07-ic1:pdcd07-ic1-am1@9011:pdcd07-ic1-am2@9012 ndcd07-icb1:ndcd07-icb1-am1@9011:ndcd07-icb1-am2@9012 pdcd07-ic2:pdcd07-ic2-am1@9011:pdcd07-ic2-am2@9012:pdcd07-ic2-am3@9013 ndcd07-icb2:ndcd07-icb2-am1@9011:ndcd07-icb2-am2@9012:ndcd07-icb2-am3@9013 pdcd07-ic3:pdcd07-ic3-bgp1@9087:pdcd07-ic3-ospf1@9092 ndcd07-icb3:ndcd07-icb3-bgp1@9087:ndcd07-icb3-ospf1@9092, pdcd07-ic3:pdcd07-ic3-oi1@9006 ndcd07-icb3:ndcd07-icb3-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd07-cnhca1:, pdcd07-snmcpe1:pdcd07-snmcpe1-syslog1@9036 ndcd07-snmcpeb1:ndcd07-snmcpeb1-syslog1@9036, pdcd07-snmcpe1:pdcd07-snmcpe1-dm1@9026:pdcd07-snmcpe1-bgpdm1@9027:pdcd07-snmcpe1-ospfdm1@9028 ndcd07-snmcpeb1:ndcd07-snmcpeb1-dm1@9026:ndcd07-snmcpeb1-bgpdm1@9027:ndcd07-snmcpeb1-ospfdm1@9028, pdcd07-ic3:pdcd07-ic3-voip1@9041 ndcd07-icb3:ndcd07-icb3-voip1@9041'
+DOMAIN[8]='pdcc01-sam9:pdcc01-sam9-sam1@9005 ndcc01-samb9:ndcc01-samb9-sam1@9005 pdcc01-sam9:pdcc01-sam9-xda1@9097 ndcc01-samb9:ndcc01-samb9-xda1@9097, pdcd08-ic1:pdcd08-ic1-am1@9011:pdcd08-ic1-am2@9012 ndcd08-icb1:ndcd08-icb1-am1@9011:ndcd08-icb1-am2@9012 pdcd08-ic2:pdcd08-ic2-am1@9011:pdcd08-ic2-am2@9012:pdcd08-ic2-am3@9013 ndcd08-icb2:ndcd08-icb2-am1@9011:ndcd08-icb2-am2@9012:ndcd08-icb2-am3@9013 pdcd08-ic5:pdcd08-ic5-am1@9011:pdcd08-ic5-am2@9012:pdcd08-ic5-am3@9013:pdcd08-ic5-am4@9014 ndcd08-icb5:ndcd08-icb5-am1@9011:ndcd08-icb5-am2@9012:ndcd08-icb5-am3@9013:ndcd08-icb5-am4@9014 pdcd08-ic3:pdcd08-ic3-mplsa1@9031:pdcd08-ic3-mplsm1@9048:pdcd08-ic3-mplst1@9082 ndcd08-icb3:ndcd08-icb3-mplsa1@9031:ndcd08-icb3-mplsm1@9048:ndcd08-icb3-mplst1@9082 pdcd08-ic4:pdcd08-ic4-am1@9011:pdcd08-ic4-am2@9012 ndcd08-icb4:ndcd08-icb4-am1@9011:ndcd08-icb4-am2@9012 pdcd08-oi1:pdcd08-oi1-bgp1@9087:pdcd08-oi1-ospf1@9092 ndcd08-oib1:ndcd08-oib1-bgp1@9087:ndcd08-oib1-ospf1@9092 pdcd08-as1:pdcd08-as1-am1@9011, pdcd08-oi1:pdcd08-oi1-oi1@9006 ndcd08-oib1:ndcd08-oib1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd08-cnhca1:, pdcd08-snmcpe1:pdcd08-snmcpe1-syslog1@9036 ndcd08-snmcpeb1:ndcd08-snmcpeb1-syslog1@9036, pdcd08-snmcpe1:pdcd08-snmcpe1-dm1@9026:pdcd08-snmcpe1-bgpdm1@9027:pdcd08-snmcpe1-ospfdm1@9028 ndcd08-snmcpeb1:ndcd08-snmcpeb1-dm1@9026:ndcd08-snmcpeb1-bgpdm1@9027:ndcd08-snmcpeb1-ospfdm1@9028, pdcd08-oi1:pdcd08-oi1-voip1@9041 ndcd08-oib1:ndcd08-oib1-voip1@9041'
+DOMAIN[9]='pdcc01-sam10:pdcc01-sam10-sam1@9005 ndcc01-samb10:ndcc01-samb10-sam1@9005 pdcc01-sam10:pdcc01-sam10-xda1@9097 ndcc01-samb10:ndcc01-samb10-xda1@9097, pdcd09-ic1:pdcd09-ic1-am1@9011:pdcd09-ic1-am2@9012 ndcd09-icb1:ndcd09-icb1-am1@9011:ndcd09-icb1-am2@9012 pdcd09-ic2:pdcd09-ic2-am1@9011:pdcd09-ic2-am2@9012 ndcd09-icb2:ndcd09-icb2-am1@9011:ndcd09-icb2-am2@9012 pdcd09-ic4:pdcd09-ic4-am1@9011:pdcd09-ic4-am2@9012 ndcd09-icb4:ndcd09-icb4-am1@9011:ndcd09-icb4-am2@9012 pdcd09-ic3:pdcd09-ic3-bgp1@9087:pdcd09-ic3-ospf1@9092 ndcd09-icb3:ndcd09-icb3-bgp1@9087:ndcd09-icb3-ospf1@9092, pdcd09-ic3:pdcd09-ic3-oi1@9006 ndcd09-icb3:ndcd09-icb3-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd09-cnhca1:, pdcd09-snmcpe1:pdcd09-snmcpe1-syslog1@9036 ndcd09-snmcpeb1:ndcd09-snmcpeb1-syslog1@9036, pdcd09-snmcpe1:pdcd09-snmcpe1-dm1@9026:pdcd09-snmcpe1-bgpdm1@9027:pdcd09-snmcpe1-ospfdm1@9028 ndcd09-snmcpeb1:ndcd09-snmcpeb1-dm1@9026:ndcd09-snmcpeb1-bgpdm1@9027:ndcd09-snmcpeb1-ospfdm1@9028, pdcd09-ic3:pdcd09-ic3-voip1@9041 ndcd09-icb3:ndcd09-icb3-voip1@9041'
+DOMAIN[10]='pdcc01-sam4:pdcc01-sam4-sam1@9005 ndcc01-samb4:ndcc01-samb4-sam1@9005 pdcc01-sam4:pdcc01-sam4-xda1@9097 ndcc01-samb4:ndcc01-samb4-xda1@9097, pdcd10-ic2:pdcd10-ic2-am1@9011:pdcd10-ic2-am2@9012 ndcd10-icb2:ndcd10-icb2-am1@9011:ndcd10-icb2-am2@9012 pdcd10-ic3:pdcd10-ic3-bgp1@9087:pdcd10-ic3-ospf1@9092 ndcd10-icb3:ndcd10-icb3-bgp1@9087:ndcd10-icb3-ospf1@9092, pdcd10-ic3:pdcd10-ic3-oi1@9006 ndcd10-icb3:ndcd10-icb3-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd10-cnh1:, pdcd10-snmcpe1:pdcd10-snmcpe1-syslog1@9036 ndcd10-snmcpeb1:ndcd10-snmcpeb1-syslog1@9036, pdcd10-snmcpe1:pdcd10-snmcpe1-dm1@9026:pdcd10-snmcpe1-bgpdm1@9027:pdcd10-snmcpe1-ospfdm1@9028 ndcd10-snmcpeb1:ndcd10-snmcpeb1-dm1@9026:ndcd10-snmcpeb1-bgpdm1@9027:ndcd10-snmcpeb1-ospfdm1@9028, pdcd10-ic3:pdcd10-ic3-voip1@9041 ndcd10-icb3:ndcd10-icb3-voip1@9041'
+DOMAIN[11]='pdcd11-sam1:pdcd11-sam1-sam1@9005:pdcd11-sam1-sam2@9004 ndcd11-samb1:ndcd11-samb1-sam1@9005:ndcd11-samb1-sam2@9004 pdcd11-sam1:pdcd11-sam1-xda1@9097 ndcd11-samb1:ndcd11-samb1-xda1@9097, pdcd11-ic1:pdcd11-ic1-am1@9011:pdcd11-ic1-am2@9012:pdcd11-ic1-am3@9013:pdcd11-ic1-am4@9014 ndcd11-icb1:ndcd11-icb1-am1@9011:ndcd11-icb1-am2@9012:ndcd11-icb1-am3@9013:ndcd11-icb1-am4@9014 pdcd11-sam1:pdcd11-sam1-bgp1@9087:pdcd11-sam1-ospf1@9092 ndcd11-samb1:ndcd11-samb1-bgp1@9087:ndcd11-samb1-ospf1@9092, pdcd11-sam1:pdcd11-sam1-oi1@9006 ndcd11-samb1:ndcd11-samb1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd11-cnhca1: ndcd11-cnhca2: ndcd11-cnhca3:, pdcd11-snmcpe1:pdcd11-snmcpe1-syslog1@9036 ndcd11-snmcpeb1:ndcd11-snmcpeb1-syslog1@9036, pdcd11-snmcpe1:pdcd11-snmcpe1-dm1@9026:pdcd11-snmcpe1-bgpdm1@9027:pdcd11-snmcpe1-ospfdm1@9028 ndcd11-snmcpeb1:ndcd11-snmcpeb1-dm1@9026:ndcd11-snmcpeb1-bgpdm1@9027:ndcd11-snmcpeb1-ospfdm1@9028, pdcd11-sam1:pdcd11-sam1-voip1@9041 ndcd11-samb1:ndcd11-samb1-voip1@9041'
+DOMAIN[12]='pdcd12-sam1:pdcd12-sam1-sam1@9005 ndcd12-samb1:ndcd12-samb1-sam1@9005 pdcd12-sam1:pdcd12-sam1-xda1@9097 ndcd12-samb1:ndcd12-samb1-xda1@9097, pdcd12-ic1:pdcd12-ic1-am1@9011:pdcd12-ic1-am2@9012:pdcd12-ic1-am3@9013:pdcd12-ic1-am4@9014 ndcd12-icb1:ndcd12-icb1-am1@9011:ndcd12-icb1-am2@9012:ndcd12-icb1-am3@9013:ndcd12-icb1-am4@9014 pdcd12-ic3:pdcd12-ic3-bgp1@9087:pdcd12-ic3-ospf1@9092 ndcd12-icb3:ndcd12-icb3-bgp1@9087:ndcd12-icb3-ospf1@9092, pdcd12-ic3:pdcd12-ic3-oi1@9006 ndcd12-icb3:ndcd12-icb3-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd12-cnhca1:, pdcd12-snmcpe1:pdcd12-snmcpe1-syslog1@9036 ndcd12-snmcpeb1:ndcd12-snmcpeb1-syslog1@9036, pdcd12-snmcpe1:pdcd12-snmcpe1-dm1@9026:pdcd12-snmcpe1-bgpdm1@9027:pdcd12-snmcpe1-ospfdm1@9028 ndcd12-snmcpeb1:ndcd12-snmcpeb1-dm1@9026:ndcd12-snmcpeb1-bgpdm1@9027:ndcd12-snmcpeb1-ospfdm1@9028, pdcd12-ic3:pdcd12-ic3-voip1@9041 ndcd12-icb3:ndcd12-icb3-voip1@9041'
+DOMAIN[13]='pdcc01-sam13:pdcc01-sam13-sam1@9005 ndcc01-samb13:ndcc01-samb13-sam1@9005 pdcc01-sam13:pdcc01-sam13-xda1@9097 ndcc01-samb13:ndcc01-samb13-xda1@9097, pdcd13-ic1:pdcd13-ic1-ampm1@9021:pdcd13-ic1-ampm2@9022 ndcd13-icb1:ndcd13-icb1-ampm1@9021:ndcd13-icb1-ampm2@9022 pdcd13-ic1:pdcd13-ic1-mplsa1@9031:pdcd13-ic1-mplsm1@9048:pdcd13-ic1-mplst1@9082 ndcd13-icb1:ndcd13-icb1-mplsa1@9031:ndcd13-icb1-mplsm1@9048:ndcd13-icb1-mplst1@9082 pdcd13-ic2:pdcd13-ic2-bgp1@9087:pdcd13-ic2-ospf1@9092 ndcd13-icb2:ndcd13-icb2-bgp1@9087:ndcd13-icb2-ospf1@9092 pdcd13-ic1:pdcd13-ic1-acm1@9016 ndcd13-icb1:ndcd13-icb1-acm1@9016 pdcd13-ic2:pdcd13-ic2-esm1@9076 ndcd13-icb2:ndcd13-icb2-esm1@9076, pdcd13-ic2:pdcd13-ic2-oi1@9006 ndcd13-icb2:ndcd13-icb2-oi1@9006,, pdcc01-sam13: ndcc01-samb13:, ndcd13-cnh1:, pdcd13-snmcpe1:pdcd13-snmcpe1-syslog1@9036 ndcd13-snmcpeb1:ndcd13-snmcpeb1-syslog1@9036, pdcd13-snmcpe1:pdcd13-snmcpe1-dm1@9026:pdcd13-snmcpe1-bgpdm1@9027:pdcd13-snmcpe1-ospfdm1@9028 ndcd13-snmcpeb1:ndcd13-snmcpeb1-dm1@9026:ndcd13-snmcpeb1-bgpdm1@9027:ndcd13-snmcpeb1-ospfdm1@9028, pdcd13-ic2:pdcd13-ic2-voip1@9041 ndcd13-icb2:ndcd13-icb2-voip1@9041'
+DOMAIN[14]='pdcc01-sam14:pdcc01-sam14-sam1@9005 ndcc01-samb14:ndcc01-samb14-sam1@9005 pdcc01-sam14:pdcc01-sam14-xda1@9097 ndcc01-samb14:ndcc01-samb14-xda1@9097, pdcd14-ic1:pdcd14-ic1-ampm1@9021:pdcd14-ic1-ampm2@9022 ndcd14-icb1:ndcd14-icb1-ampm1@9021:ndcd14-icb1-ampm2@9022 pdcd14-ic2:pdcd14-ic2-am1@9011:pdcd14-ic2-am2@9012:pdcd14-ic2-am3@9013 pdcd14-icb2:pdcd14-icb2-am1@9011:pdcd14-icb2-am2@9012:pdcd14-icb2-am3@9013 pdcd14-ic4:pdcd14-ic4-ampm1@9021:pdcd14-ic4-ampm2@9022 ndcd14-icb4:ndcd14-icb4-ampm1@9021:ndcd14-icb4-ampm2@9022 pdcd14-ic5:pdcd14-ic5-ampm1@9021:pdcd14-ic5-ampm2@9022:pdcd14-ic5-ampm3@9023:pdcd14-ic5-ampm4@9024 ndcd14-icb5:ndcd14-icb5-ampm1@9021:ndcd14-icb5-ampm2@9022:ndcd14-icb5-ampm3@9023:ndcd14-icb5-ampm4@9024 pdcd14-ic3:pdcd14-ic3-bgp1@9087:pdcd14-ic3-ospf1@9092 ndcd14-icb3:ndcd14-icb3-bgp1@9087:ndcd14-icb3-ospf1@9092, pdcd14-ic3:pdcd14-ic3-oi1@9006 ndcd14-icb3:ndcd14-icb3-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd14-cnhca1:, pdcd14-snmcpe1:pdcd14-snmcpe1-syslog1@9036 pdcd14-snmcpeb1:pdcd14-snmcpeb1-syslog1@9036, pdcd14-snmcpe1:pdcd14-snmcpe1-dm1@9026:pdcd14-snmcpe1-bgpdm1@9027:pdcd14-snmcpe1-ospfdm1@9028 pdcd14-snmcpeb1:pdcd14-snmcpeb1-dm1@9026:pdcd14-snmcpeb1-bgpdm1@9027:pdcd14-snmcpeb1-ospfdm1@9028, pdcd14-ic3:pdcd14-ic3-voip1@9041 ndcd14-icb3:ndcd14-icb3-voip1@9041'
+DOMAIN[15]='pdcc01-sam2:pdcc01-sam2-sam1@9005 ndcc01-samb2:ndcc01-samb2-sam1@9005 pdcc01-sam7:pdcc01-sam7-sam1@9005 ndcc01-samb7:ndcc01-samb7-sam1@9005 pdcc01-sam2:pdcc01-sam2-xda1@9097 ndcc01-samb2:ndcc01-samb2-xda1@9097 pdcc01-sam7:pdcc01-sam7-xda1@9097 ndcc01-samb7:ndcc01-samb7-xda1@9097, pdcd15-ic1:pdcd15-ic1-ampm1@9021:pdcd15-ic1-ampm2@9022 ndcd15-icb1:ndcd15-icb1-ampm1@9021:ndcd15-icb1-ampm2@9022 pdcd15-ic2:pdcd15-ic2-ampm1@9021:pdcd15-ic2-ampm2@9022:pdcd15-ic2-ampm3@9023 ndcd15-icb2:ndcd15-icb2-ampm1@9021:ndcd15-icb2-ampm2@9022:ndcd15-icb2-ampm3@9023 pdcd15-ic3:pdcd15-ic3-ampm1@9021:pdcd15-ic3-ampm2@9022 ndcd15-icb3:ndcd15-icb3-ampm1@9021:ndcd15-icb3-ampm2@9022 pdcd15-ic4:pdcd15-ic4-ampm1@9021:pdcd15-ic4-ampm2@9022 ndcd15-icb4:ndcd15-icb4-ampm1@9021:ndcd15-icb4-ampm2@9022 pdcd15-ic5:pdcd15-ic5-ampm1@9021 ndcd15-icb5:ndcd15-icb5-ampm1@9021 pdcd15-ic6:pdcd15-ic6-ampm1@9021:pdcd15-ic6-ampm2@9022 ndcd15-icb6:ndcd15-icb6-ampm1@9021:ndcd15-icb6-ampm2@9022 pdcd15-ic5:pdcd15-ic5-bgp1@9087:pdcd15-ic5-ospf1@9092 ndcd15-icb5:ndcd15-icb5-bgp1@9087:ndcd15-icb5-ospf1@9092, pdcd15-ic5:pdcd15-ic5-oi1@9006:pdcd15-ic5-oi2@9007:pdcd15-ic5-oi3@9008 ndcd15-icb5:ndcd15-icb5-oi1@9006:ndcd15-icb5-oi2@9007:ndcd15-icb5-oi3@9008,, pdcc01-sis1: ndcc01-sisb1:, ndcd15-cnhca1:, pdcd15-snmcpe1:pdcd15-snmcpe1-syslog1@9036 ndcd15-snmcpeb1:ndcd15-snmcpeb1-syslog1@9036, pdcd15-snmcpe1:pdcd15-snmcpe1-dm1@9026:pdcd15-snmcpe1-bgpdm1@9027:pdcd15-snmcpe1-ospfdm1@9028 ndcd15-snmcpeb1:ndcd15-snmcpeb1-dm1@9026:ndcd15-snmcpeb1-bgpdm1@9027:ndcd15-snmcpeb1-ospfdm1@9028, pdcd15-ic5:pdcd15-ic5-voip1@9041 ndcd15-icb5:ndcd15-icb5-voip1@9041'
+DOMAIN[16]='pdcc01-sam3:pdcc01-sam3-sam1@9005:pdcc01-sam3-sam2@9004 ndcc01-samb3:ndcc01-samb3-sam1@9005:ndcc01-samb3-sam2@9004 pdcc01-sam3:pdcc01-sam3-xda1@9097 ndcc01-samb3:ndcc01-samb3-xda1@9097, pdcd16-ic1:pdcd16-ic1-am1@9011 ndcd16-icb1:ndcd16-icb1-am1@9011 pdcd16-oi1:pdcd16-oi1-bgp1@9087:pdcd16-oi1-ospf1@9092 ndcd16-oib1:ndcd16-oib1-bgp1@9087:ndcd16-oib1-ospf1@9092, pdcd16-oi1:pdcd16-oi1-oi1@9006 ndcd16-oib1:ndcd16-oib1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, pdcd16-cnh1: ndcd16-cnhb1:, pdcd16-snmcpe1:pdcd16-snmcpe1-syslog1@9036 ndcd16-snmcpeb1:ndcd16-snmcpeb1-syslog1@9036, pdcd16-snmcpe1:pdcd16-snmcpe1-dm1@9026:pdcd16-snmcpe1-bgpdm1@9027:pdcd16-snmcpe1-ospfdm1@9028 ndcd16-snmcpeb1:ndcd16-snmcpeb1-dm1@9026:ndcd16-snmcpeb1-bgpdm1@9027:ndcd16-snmcpeb1-ospfdm1@9028, pdcd16-oi1:pdcd16-oi1-voip1@9041 ndcd16-oib1:ndcd16-oib1-voip1@9041'
+DOMAIN[17]='pdcc01-sam4:pdcc01-sam4-sam1@9005 ndcc01-samb4:ndcc01-samb4-sam1@9005 pdcc01-sam4:pdcc01-sam4-xda1@9097 ndcc01-samb4:ndcc01-samb4-xda1@9097, pdcd17-ic1:pdcd17-ic1-am1@9011 ndcd17-icb1:ndcd17-icb1-am1@9011 pdcd17-oi1:pdcd17-oi1-bgp1@9087:pdcd17-oi1-ospf1@9092 ndcd17-oib1:ndcd17-oib1-bgp1@9087:ndcd17-oib1-ospf1@9092, pdcd17-oi1:pdcd17-oi1-oi1@9006 ndcd17-oib1:ndcd17-oib1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:,, pdcd17-snmcpe1:pdcd17-snmcpe1-syslog1@9036 ndcd17-snmcpeb1:ndcd17-snmcpeb1-syslog1@9036, pdcd17-snmcpe1:pdcd17-snmcpe1-dm1@9026:pdcd17-snmcpe1-bgpdm1@9027:pdcd17-snmcpe1-ospfdm1@9028 ndcd17-snmcpeb1:ndcd17-snmcpeb1-dm1@9026:ndcd17-snmcpeb1-bgpdm1@9027:ndcd17-snmcpeb1-ospfdm1@9028, pdcd17-oi1:pdcd17-oi1-voip1@9041 ndcd17-oib1:ndcd17-oib1-voip1@9041'
+DOMAIN[18]='pdcc01-sam18:pdcc01-sam18-sam1@9005 ndcc01-samb18:ndcc01-samb18-sam1@9005 pdcc01-sam18:pdcc01-sam18-xda1@9097 ndcc01-samb18:ndcc01-samb18-xda1@9097, pdcd18-ic1:pdcd18-ic1-am1@9011:pdcd18-ic1-am2@9012 ndcd18-icb1:ndcd18-icb1-am1@9011:ndcd18-icb1-am2@9012 pdcd18-ic2:pdcd18-ic2-am1@9011:pdcd18-ic2-am2@9012 ndcd18-icb2:ndcd18-icb2-am1@9011:ndcd18-icb2-am2@9012 pdcd18-ic3:pdcd18-ic3-am1@9011:pdcd18-ic3-am2@9012 ndcd18-icb3:ndcd18-icb3-am1@9011:ndcd18-icb3-am2@9012 pdcd18-ic4:pdcd18-ic4-am1@9011:pdcd18-ic4-am2@9012 ndcd18-icb4:ndcd18-icb4-am1@9011:ndcd18-icb4-am2@9012 pdcd18-ic6:pdcd18-ic6-am1@9011:pdcd18-ic6-am2@9012 ndcd18-icb6:ndcd18-icb6-am1@9011:ndcd18-icb6-am2@9012 pdcd18-ic7:pdcd18-ic7-am1@9011:pdcd18-ic7-am2@9012 ndcd18-icb7:ndcd18-icb7-am1@9011:ndcd18-icb7-am2@9012 pdcd18-ic5:pdcd18-ic5-bgp1@9087:pdcd18-ic5-ospf1@9092 ndcd18-icb5:ndcd18-icb5-bgp1@9087:ndcd18-icb5-ospf1@9092, pdcd18-ic5:pdcd18-ic5-oi1@9006 ndcd18-icb5:ndcd18-icb5-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd18-cnhca1: ndcd18-cnhca2: ndcd18-cnhca3: ndcd18-cnhca4: ndcd18-cnhca5: ndcd18-cnhca6: ndcd18-cnhca7: ndcd18-cnhca8: ndcd18-cnhca9: ndcd18-cnhca10: ndcd18-cnhca11: ndcd18-cnhca12: ndcd18-cnhca13: ndcd18-cnhca14: ndcd18-cnhca15: ndcd18-cnhca16: ndcd18-cnhca17: ndcd18-cnhca18: ndcd18-cnhca19: ndcd18-cnhca20: ndcd18-cnhca21:, pdcd18-snmcpe1:pdcd18-snmcpe1-syslog1@9036 ndcd18-snmcpeb1:ndcd18-snmcpeb1-syslog1@9036, pdcd18-snmcpe1:pdcd18-snmcpe1-dm1@9026:pdcd18-snmcpe1-bgpdm1@9027:pdcd18-snmcpe1-ospfdm1@9028 ndcd18-snmcpeb1:ndcd18-snmcpeb1-dm1@9026:ndcd18-snmcpeb1-bgpdm1@9027:ndcd18-snmcpeb1-ospfdm1@9028, pdcd18-ic5:pdcd18-ic5-voip1@9041 ndcd18-icb5:ndcd18-icb5-voip1@9041'
+DOMAIN[20]='pdcc01-sam6:pdcc01-sam6-sam1@9005 ndcc01-samb6:ndcc01-samb6-sam1@9005 pdcc01-sam6:pdcc01-sam6-xda1@9097 ndcc01-samb6:ndcc01-samb6-xda1@9097, pdcd20-ic1:pdcd20-ic1-am1@9011:pdcd20-ic1-am2@9012 ndcd20-icb1:ndcd20-icb1-am1@9011:ndcd20-icb1-am2@9012 pdcd20-ic2:pdcd20-ic2-am1@9011:pdcd20-ic2-am2@9012 ndcd20-icb2:ndcd20-icb2-am1@9011:ndcd20-icb2-am2@9012 pdcd20-ic3:pdcd20-ic3-am1@9011:pdcd20-ic3-am2@9012 ndcd20-icb3:ndcd20-icb3-am1@9011:ndcd20-icb3-am2@9012 pdcd20-ic4:pdcd20-ic4-am1@9011:pdcd20-ic4-am2@9012 ndcd20-icb4:ndcd20-icb4-am1@9011:ndcd20-icb4-am2@9012 pdcd20-ic5:pdcd20-ic5-am1@9011:pdcd20-ic5-am2@9012 ndcd20-icb5:ndcd20-icb5-am1@9011:ndcd20-icb5-am2@9012 pdcd20-as1:pdcd20-as1-am1@9011 pdcd20-oi1:pdcd20-oi1-bgp1@9087:pdcd20-oi1-ospf1@9092 ndcd20-oib1:ndcd20-oib1-bgp1@9087:ndcd20-oib1-ospf1@9092, pdcd20-oi1:pdcd20-oi1-oi1@9006 ndcd20-oib1:ndcd20-oib1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:,, pdcd20-snmcpe1:pdcd20-snmcpe1-syslog1@9036 ndcd20-snmcpeb1:ndcd20-snmcpeb1-syslog1@9036, pdcd20-snmcpe1:pdcd20-snmcpe1-dm1@9026:pdcd20-snmcpe1-bgpdm1@9027:pdcd20-snmcpe1-ospfdm1@9028 ndcd20-snmcpeb1:ndcd20-snmcpeb1-dm1@9026:ndcd20-snmcpeb1-bgpdm1@9027:ndcd20-snmcpeb1-ospfdm1@9028, pdcd20-oi1:pdcd20-oi1-voip1@9041 ndcd20-oib1:ndcd20-oib1-voip1@9041,, pdcd20-ivd1: pdcd20-ivd2:'
+DOMAIN[21]='pdcd21-sam1:pdcd21-sam1-sam1@9005 ndcd21-samb1:ndcd21-samb1-sam1@9005 pdcd21-sam1:pdcd21-sam1-xda1@9097 ndcd21-samb1:ndcd21-samb1-xda1@9097, pdcd21-ic1:pdcd21-ic1-am1@9011 ndcd21-icb1:ndcd21-icb1-am1@9011 pdcd21-as1:pdcd21-as1-am1@9011 pdcd21-ic1:pdcd21-ic1-bgp1@9087:pdcd21-ic1-ospf1@9092 ndcd21-icb1:ndcd21-icb1-bgp1@9087:ndcd21-icb1-ospf1@9092, pdcd21-ic1:pdcd21-ic1-oi1@9006 ndcd21-icb1:ndcd21-icb1-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, pdcd21-cnh1:, pdcd21-snmcpe1:pdcd21-snmcpe1-syslog1@9036 ndcd21-snmcpeb1:ndcd21-snmcpeb1-syslog1@9036, pdcd21-snmcpe1:pdcd21-snmcpe1-dm1@9026:pdcd21-snmcpe1-bgpdm1@9027:pdcd21-snmcpe1-ospfdm1@9028 ndcd21-snmcpeb1:ndcd21-snmcpeb1-dm1@9026:ndcd21-snmcpeb1-bgpdm1@9027:ndcd21-snmcpeb1-ospfdm1@9028, pdcd21-ic1:pdcd21-ic1-voip1@9041 ndcd21-icb1:ndcd21-icb1-voip1@9041'
+DOMAIN[22]='pdcc02-sam22:pdcc02-sam22-sam1@9005 ndcc02-samb22:ndcc02-samb22-sam1@9005 pdcc02-sam22:pdcc02-sam22-xda1@9097 ndcc02-samb22:ndcc02-samb22-xda1@9097, pdcd22-ic1:pdcd22-ic1-am1@9011:pdcd22-ic1-am2@9012 ndcd22-icb1:ndcd22-icb1-am1@9011:ndcd22-icb1-am2@9012 pdcd22-ic2:pdcd22-ic2-bgp1@9087:pdcd22-ic2-ospf1@9092 ndcd22-icb2:ndcd22-icb2-bgp1@9087:ndcd22-icb2-ospf1@9092, pdcd22-ic2:pdcd22-ic2-oi1@9006 ndcd22-icb2:ndcd22-icb2-oi1@9006,, pdcc02-sis2: ndcc02-sisb2:, pdcd22-cnh1: pdcd22-cnh2: pdcd22-cnh3: pdcd22-cnh4: pdcd22-cnh5:, pdcd22-snmcpe1:pdcd22-snmcpe1-syslog1@9036 ndcd22-snmcpeb1:ndcd22-snmcpeb1-syslog1@9036, pdcd22-snmcpe1:pdcd22-snmcpe1-dm1@9026:pdcd22-snmcpe1-bgpdm1@9027:pdcd22-snmcpe1-ospfdm1@9028 ndcd22-snmcpeb1:ndcd22-snmcpeb1-dm1@9026:ndcd22-snmcpeb1-bgpdm1@9027:ndcd22-snmcpeb1-ospfdm1@9028, pdcd22-ic2:pdcd22-ic2-voip1@9041 ndcd22-icb2:ndcd22-icb2-voip1@9041'
+DOMAIN[23]='pdcc01-sam23:pdcc01-sam23-sam1@9005 ndcc01-samb23:ndcc01-samb23-sam1@9005 pdcc01-sam23:pdcc01-sam23-xda1@9097 ndcc01-samb23:ndcc01-samb23-xda1@9097, pdcd23-ic1:pdcd23-ic1-am1@9011:pdcd23-ic1-am2@9012 ndcd23-icb1:ndcd23-icb1-am1@9011:ndcd23-icb1-am2@9012 pdcd23-ic2:pdcd23-ic2-am1@9011:pdcd23-ic2-am2@9012 ndcd23-icb2:ndcd23-icb2-am1@9011:ndcd23-icb2-am2@9012 pdcd23-ic3:pdcd23-ic3-bgp1@9087:pdcd23-ic3-ospf1@9092 ndcd23-icb3:ndcd23-icb3-bgp1@9087:ndcd23-icb3-ospf1@9092, pdcd23-ic3:pdcd23-ic3-oi1@9006 ndcd23-icb3:ndcd23-icb3-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd23-cnhca1:, pdcd23-snmcpe1:pdcd23-snmcpe1-syslog1@9036 ndcd23-snmcpeb1:ndcd23-snmcpeb1-syslog1@9036, pdcd23-snmcpe1:pdcd23-snmcpe1-dm1@9026:pdcd23-snmcpe1-bgpdm1@9027:pdcd23-snmcpe1-ospfdm1@9028 ndcd23-snmcpeb1:ndcd23-snmcpeb1-dm1@9026:ndcd23-snmcpeb1-bgpdm1@9027:ndcd23-snmcpeb1-ospfdm1@9028, pdcd23-ic3:pdcd23-ic3-voip1@9041 ndcd23-icb3:ndcd23-icb3-voip1@9041'
+DOMAIN[24]='pdcc01-sam24:pdcc01-sam24-sam1@9005 ndcc01-samb24:ndcc01-samb24-sam1@9005 pdcc01-sam24:pdcc01-sam24-xda1@9097 ndcc01-samb24:ndcc01-samb24-xda1@9097, pdcd24-ic1:pdcd24-ic1-am1@9011:pdcd24-ic1-am2@9012 ndcd24-icb1:ndcd24-icb1-am1@9011:ndcd24-icb1-am2@9012 pdcd24-as1:pdcd24-as1-am1@9011 pdcd24-ic2:pdcd24-ic2-bgp1@9087:pdcd24-ic2-ospf1@9092 ndcd24-icb2:ndcd24-icb2-bgp1@9087:ndcd24-icb2-ospf1@9092, pdcd24-ic2:pdcd24-ic2-oi1@9006 ndcd24-icb2:ndcd24-icb2-oi1@9006,, pdcc01-sis1: ndcc01-sisb1:, ndcd24-cnhca1:, pdcd24-snmcpe1:pdcd24-snmcpe1-syslog1@9036 ndcd24-snmcpeb1:ndcd24-snmcpeb1-syslog1@9036, pdcd24-snmcpe1:pdcd24-snmcpe1-dm1@9026:pdcd24-snmcpe1-bgpdm1@9027:pdcd24-snmcpe1-ospfdm1@9028 ndcd24-snmcpeb1:ndcd24-snmcpeb1-dm1@9026:ndcd24-snmcpeb1-bgpdm1@9027:ndcd24-snmcpeb1-ospfdm1@9028, pdcd24-ic2:pdcd24-ic2-voip1@9041 ndcd24-icb2:ndcd24-icb2-voip1@9041'
+DOMAIN[25]='pdcc01-sam25:pdcc01-sam25-sam1@9005 ndcc01-samb25:ndcc01-samb25-sam1@9005 pdcc01-sam25:pdcc01-sam25-xda1@9097 ndcc01-samb25:ndcc01-samb25-xda1@9097, pdcd25-ic1:pdcd25-ic1-am1@9011:pdcd25-ic1-am2@9012 ndcd25-icb1:ndcd25-icb1-am1@9011:ndcd25-icb1-am2@9012 pdcd25-ic2:pdcd25-ic2-am1@9011:pdcd25-ic2-am2@9012 ndcd25-icb2:ndcd25-icb2-am1@9011:ndcd25-icb2-am2@9012 pdcd25-ic4:pdcd25-ic4-am1@9011:pdcd25-ic4-am2@9012:pdcd25-ic4-am3@9013:pdcd25-ic4-am4@9014 ndcd25-icb4:ndcd25-icb4-am1@9011:ndcd25-icb4-am2@9012:ndcd25-icb4-am3@9013:ndcd25-icb4-am4@9014 pdcd25-ic3:pdcd25-ic3-bgp1@9087:pdcd25-ic3-ospf1@9092 ndcd25-icb3:ndcd25-icb3-bgp1@9087:ndcd25-icb3-ospf1@9092, pdcd25-ic3:pdcd25-ic3-oi1@9006 ndcd25-icb3:ndcd25-icb3-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, ndcd25-cnhca1:, pdcd25-snmcpe1:pdcd25-snmcpe1-syslog1@9036 ndcd25-snmcpeb1:ndcd25-snmcpeb1-syslog1@9036, pdcd25-snmcpe1:pdcd25-snmcpe1-dm1@9026:pdcd25-snmcpe1-bgpdm1@9027:pdcd25-snmcpe1-ospfdm1@9028 ndcd25-snmcpeb1:ndcd25-snmcpeb1-dm1@9026:ndcd25-snmcpeb1-bgpdm1@9027:ndcd25-snmcpeb1-ospfdm1@9028, pdcd25-ic3:pdcd25-ic3-voip1@9041 ndcd25-icb3:ndcd25-icb3-voip1@9041'
+DOMAIN[26]='pdcc01-sam26:pdcc01-sam26-sam1@9005 ndcc01-samb26:ndcc01-samb26-sam1@9005 pdcc01-sam26:pdcc01-sam26-xda1@9097 ndcc01-samb26:ndcc01-samb26-xda1@9097, pdcd26-ic1:pdcd26-ic1-am1@9011:pdcd26-ic1-am2@9012 ndcd26-icb1:ndcd26-icb1-am1@9011:ndcd26-icb1-am2@9012 pdcd26-ic2:pdcd26-ic2-am1@9011:pdcd26-ic2-am2@9012 ndcd26-icb2:ndcd26-icb2-am1@9011:ndcd26-icb2-am2@9012 pdcd26-ic3:pdcd26-ic3-am1@9011:pdcd26-ic3-am2@9012 ndcd26-icb3:ndcd26-icb3-am1@9011:ndcd26-icb3-am2@9012 pdcd26-ic4:pdcd26-ic4-am1@9011:pdcd26-ic4-am2@9012 ndcd26-icb4:ndcd26-icb4-am1@9011:ndcd26-icb4-am2@9012 pdcd26-ic2:pdcd26-ic2-bgp1@9087:pdcd26-ic2-ospf1@9092 ndcd26-icb2:ndcd26-icb2-bgp1@9087:ndcd26-icb2-ospf1@9092, pdcd26-ic2:pdcd26-ic2-oi1@9006 ndcd26-icb2:ndcd26-icb2-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, ndcd26-cnhca1:, pdcd26-snmcpe1:pdcd26-snmcpe1-syslog1@9036 ndcd26-snmcpeb1:ndcd26-snmcpeb1-syslog1@9036, pdcd26-snmcpe1:pdcd26-snmcpe1-dm1@9026:pdcd26-snmcpe1-bgpdm1@9027:pdcd26-snmcpe1-ospfdm1@9028 ndcd26-snmcpeb1:ndcd26-snmcpeb1-dm1@9026:ndcd26-snmcpeb1-bgpdm1@9027:ndcd26-snmcpeb1-ospfdm1@9028, pdcd26-ic2:pdcd26-ic2-voip1@9041 ndcd26-icb2:ndcd26-icb2-voip1@9041'
+DOMAIN[27]='pdcc01-sam27:pdcc01-sam27-sam1@9005 ndcc01-samb27:ndcc01-samb27-sam1@9005 pdcc01-sam27:pdcc01-sam27-xda1@9097 ndcc01-samb27:ndcc01-samb27-xda1@9097, pdcd27-ic1:pdcd27-ic1-ampm1@9021:pdcd27-ic1-ampm2@9022 ndcd27-icb1:ndcd27-icb1-ampm1@9021:ndcd27-icb1-ampm2@9022 pdcd27-ic2:pdcd27-ic2-ampm1@9021:pdcd27-ic2-ampm2@9022 ndcd27-icb2:ndcd27-icb2-ampm1@9021:ndcd27-icb2-ampm2@9022 pdcd27-ic4:pdcd27-ic4-bgp1@9087:pdcd27-ic4-ospf1@9092 ndcd27-icb4:ndcd27-icb4-bgp1@9087:ndcd27-icb4-ospf1@9092, pdcd27-ic4:pdcd27-ic4-oi1@9006 ndcd27-icb4:ndcd27-icb4-oi1@9006,, pdcc01-sam27: ndcc01-samb27:,, pdcd27-snmcpe1:pdcd27-snmcpe1-syslog1@9036 ndcd27-snmcpeb1:ndcd27-snmcpeb1-syslog1@9036, pdcd27-snmcpe1:pdcd27-snmcpe1-dm1@9026:pdcd27-snmcpe1-bgpdm1@9027:pdcd27-snmcpe1-ospfdm1@9028 ndcd27-snmcpeb1:ndcd27-snmcpeb1-dm1@9026:ndcd27-snmcpeb1-bgpdm1@9027:ndcd27-snmcpeb1-ospfdm1@9028, pdcd27-ic4:pdcd27-ic4-voip1@9041 ndcd27-icb4:ndcd27-icb4-voip1@9041'
+DOMAIN[28]='pdcc01-sam28:pdcc01-sam28-sam1@9005 ndcc01-samb28:ndcc01-samb28-sam1@9005 pdcc01-sam28:pdcc01-sam28-xda1@9097 ndcc01-samb28:ndcc01-samb28-xda1@9097, pdcd28-ic1:pdcd28-ic1-ampm1@9021:pdcd28-ic1-ampm2@9022 ndcd28-icb1:ndcd28-icb1-ampm1@9021:ndcd28-icb1-ampm2@9022 pdcd28-ic2:pdcd28-ic2-ampm1@9021 ndcd28-icb2:ndcd28-icb2-ampm1@9021 pdcd28-ic2:pdcd28-ic2-bgp1@9087:pdcd28-ic2-ospf1@9092 ndcd28-icb2:ndcd28-icb2-bgp1@9087:ndcd28-icb2-ospf1@9092, pdcd28-ic2:pdcd28-ic2-oi1@9006 ndcd28-icb2:ndcd28-icb2-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, pdcd28-cnh1: pdcd28-cnh2: pdcd28-cnh3: pdcd28-cnh4, pdcd28-snmcpe1:pdcd28-snmcpe1-syslog1@9036 ndcd28-snmcpeb1:ndcd28-snmcpeb1-syslog1@9036, pdcd28-snmcpe1:pdcd28-snmcpe1-dm1@9026:pdcd28-snmcpe1-bgpdm1@9027:pdcd28-snmcpe1-ospfdm1@9028 ndcd28-snmcpeb1:ndcd28-snmcpeb1-dm1@9026:ndcd28-snmcpeb1-bgpdm1@9027:ndcd28-snmcpeb1-ospfdm1@9028, pdcd28-ic2:pdcd28-ic2-voip1@9041 ndcd28-icb2:ndcd28-icb2-voip1@9041'
+DOMAIN[30]='pdcd30-sam1:pdcd30-sam1-sam1@9005 ndcd30-samb1:ndcd30-samb1-sam1@9005 pdcd30-sam1:pdcd30-sam1-xda1@9097 ndcd30-samb1:ndcd30-samb1-xda1@9097, pdcd30-ic1:pdcd30-ic1-ampm1@9021:pdcd30-ic1-ampm2@9022 ndcd30-icb1:ndcd30-icb1-ampm1@9021:ndcd30-icb1-ampm2@9022 pdcd30-ic3:pdcd30-ic3-ampm1@9021:pdcd30-ic3-ampm2@9022 ndcd30-icb3:ndcd30-icb3-ampm1@9021:ndcd30-icb3-ampm2@9022 pdcd30-ic4:pdcd30-ic4-ampm1@9021:pdcd30-ic4-ampm2@9022 ndcd30-icb4:ndcd30-icb4-ampm1@9021:ndcd30-icb4-ampm2@9022 pdcd30-ic5:pdcd30-ic5-ampm1@9021:pdcd30-ic5-ampm2@9022 ndcd30-icb5:ndcd30-icb5-ampm1@9021:ndcd30-icb5-ampm2@9022 pdcd30-ic2:pdcd30-ic2-bgp1@9087:pdcd30-ic2-ospf1@9092 ndcd30-icb2:ndcd30-icb2-bgp1@9087:ndcd30-icb2-ospf1@9092, pdcd30-ic2:pdcd30-ic2-oi1@9006 ndcd30-icb2:ndcd30-icb2-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, ndcd30-cnhca1:, pdcd30-snmcpe1:pdcd30-snmcpe1-syslog1@9036 ndcd30-snmcpeb1:ndcd30-snmcpeb1-syslog1@9036, pdcd30-snmcpe1:pdcd30-snmcpe1-dm1@9026:pdcd30-snmcpe1-bgpdm1@9027:pdcd30-snmcpe1-ospfdm1@9028 ndcd30-snmcpeb1:ndcd30-snmcpeb1-dm1@9026:ndcd30-snmcpeb1-bgpdm1@9027:ndcd30-snmcpeb1-ospfdm1@9028, pdcd30-ic2:pdcd30-ic2-voip1@9041 ndcd30-icb2:ndcd30-icb2-voip1@9041'
+DOMAIN[31]='pdcd31-sam1:pdcd31-sam1-sam1@9005 ndcd31-samb1:ndcd31-samb1-sam1@9005 pdcd31-sam1:pdcd31-sam1-xda1@9097 ndcd31-samb1:ndcd31-samb1-xda1@9097, pdcd31-ic1:pdcd31-ic1-ampm1@9021:pdcd31-ic1-ampm2@9022 ndcd31-icb1:ndcd31-icb1-ampm1@9021:ndcd31-icb1-ampm2@9022 pdcd31-ic2:pdcd31-ic2-bgp1@9087:pdcd31-ic2-ospf1@9092 ndcd31-icb2:ndcd31-icb2-bgp1@9087:ndcd31-icb2-ospf1@9092, pdcd31-ic2:pdcd31-ic2-oi1@9006 ndcd31-icb2:ndcd31-icb2-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, ndcd31-cnhca1:, pdcd31-snmcpe1:pdcd31-snmcpe1-syslog1@9036 ndcd31-snmcpeb1:ndcd31-snmcpeb1-syslog1@9036, pdcd31-snmcpe1:pdcd31-snmcpe1-dm1@9026:pdcd31-snmcpe1-bgpdm1@9027:pdcd31-snmcpe1-ospfdm1@9028 ndcd31-snmcpeb1:ndcd31-snmcpeb1-dm1@9026:ndcd31-snmcpeb1-bgpdm1@9027:ndcd31-snmcpeb1-ospfdm1@9028, pdcd31-ic2:pdcd31-ic2-voip1@9041 ndcd31-icb2:ndcd31-icb2-voip1@9041'
+DOMAIN[32]='pdcc02-sam22:pdcc02-sam22-sam1@9005 ndcc02-samb22:ndcc02-samb22-sam1@9005 pdcc02-sam22:pdcc02-sam22-xda1@9097 ndcc02-samb22:ndcc02-samb22-xda1@9097, pdcd32-ic1:pdcd32-ic1-am1@9011:pdcd32-ic1-am2@9012 ndcd32-icb1:ndcd32-icb1-am1@9011:ndcd32-icb1-am2@9012 pdcd32-ic2:pdcd32-ic2-bgp1@9087:pdcd32-ic2-ospf1@9092 ndcd32-icb2:ndcd32-icb2-bgp1@9087:ndcd32-icb2-ospf1@9092, pdcd32-ic2:pdcd32-ic2-oi1@9006 ndcd32-icb2:ndcd32-icb2-oi1@9006,, pdcc02-sis2: ndcc02-sisb2:,, pdcd32-snmcpe1:pdcd32-snmcpe1-syslog1@9036 ndcd32-snmcpeb1:ndcd32-snmcpeb1-syslog1@9036, pdcd32-snmcpe1:pdcd32-snmcpe1-dm1@9026:pdcd32-snmcpe1-bgpdm1@9027:pdcd32-snmcpe1-ospfdm1@9028 ndcd32-snmcpeb1:ndcd32-snmcpeb1-dm1@9026:ndcd32-snmcpeb1-bgpdm1@9027:ndcd32-snmcpeb1-ospfdm1@9028, pdcd32-ic2:pdcd32-ic2-voip1@9041 ndcd32-icb2:ndcd32-icb2-voip1@9041'
+DOMAIN[33]='pdcd33-sam1:pdcd33-sam1-sam1@9005 ndcd33-samb1:ndcd33-samb1-sam1@9005 pdcd33-sam1:pdcd33-sam1-xda1@9097 ndcd33-samb1:ndcd33-samb1-xda1@9097, pdcd33-ic1:pdcd33-ic1-ampm1@9021:pdcd33-ic1-ampm2@9022 ndcd33-icb1:ndcd33-icb1-ampm1@9021:ndcd33-icb1-ampm2@9022 pdcd33-ic2:pdcd33-ic2-ampm1@9021:pdcd33-ic2-ampm2@9022 ndcd33-icb2:ndcd33-icb2-ampm1@9021:ndcd33-icb2-ampm2@9022 pdcd33-ic3:pdcd33-ic3-bgp1@9087:pdcd33-ic3-ospf1@9092 ndcd33-icb3:ndcd33-icb3-bgp1@9087:ndcd33-icb3-ospf1@9092 pdcd33-ic3:pdcd33-ic3-esm1@9076 ndcd33-icb3:ndcd33-icb3-esm1@9076, pdcd33-ic3:pdcd33-ic3-oi1@9006 ndcd33-icb3:ndcd33-icb3-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, ndcd33-cnhca1:, pdcd33-snmcpe1:pdcd33-snmcpe1-syslog1@9036 ndcd33-snmcpeb1:ndcd33-snmcpeb1-syslog1@9036, pdcd33-snmcpe1:pdcd33-snmcpe1-dm1@9026:pdcd33-snmcpe1-bgpdm1@9027:pdcd33-snmcpe1-ospfdm1@9028 ndcd33-snmcpeb1:ndcd33-snmcpeb1-dm1@9026:ndcd33-snmcpeb1-bgpdm1@9027:ndcd33-snmcpeb1-ospfdm1@9028, pdcd33-ic3:pdcd33-ic3-voip1@9041 ndcd33-icb3:ndcd33-icb3-voip1@9041'
+DOMAIN[34]='pdcd34-sam1:pdcd34-sam1-sam1@9005 ndcd34-samb1:ndcd34-samb1-sam1@9005 pdcd34-sam1:pdcd34-sam1-xda1@9097 ndcd34-samb1:ndcd34-samb1-xda1@9097, pdcd34-ic1:pdcd34-ic1-ampm1@9021:pdcd34-ic1-ampm2@9022:pdcd34-ic1-ampm3@9023:pdcd34-ic1-ampm4@9024 ndcd34-icb1:ndcd34-icb1-ampm1@9021:ndcd34-icb1-ampm2@9022:ndcd34-icb1-ampm3@9023:ndcd34-icb1-ampm4@9024 pdcd34-sam1:pdcd34-sam1-bgp1@9087:pdcd34-sam1-ospf1@9092 ndcd34-samb1:ndcd34-samb1-bgp1@9087:ndcd34-samb1-ospf1@9092, pdcd34-sam1:pdcd34-sam1-oi1@9006 ndcd34-samb1:ndcd34-samb1-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:,, pdcd34-snmcpe1:pdcd34-snmcpe1-syslog1@9036 ndcd34-snmcpeb1:ndcd34-snmcpeb1-syslog1@9036, pdcd34-snmcpe1:pdcd34-snmcpe1-dm1@9026:pdcd34-snmcpe1-bgpdm1@9027:pdcd34-snmcpe1-ospfdm1@9028 ndcd34-snmcpeb1:ndcd34-snmcpeb1-dm1@9026:ndcd34-snmcpeb1-bgpdm1@9027:ndcd34-snmcpeb1-ospfdm1@9028, pdcd34-sam1:pdcd34-sam1-voip1@9041 ndcd34-samb1:ndcd34-samb1-voip1@9041'
+DOMAIN[35]='pdcd35-sam1:pdcd35-sam1-sam1@9005 ndcd35-samb1:ndcd35-samb1-sam1@9005 pdcd35-sam1:pdcd35-sam1-xda1@9097 ndcd35-samb1:ndcd35-samb1-xda1@9097, pdcd35-ic4:pdcd35-ic4-ampm1@9021:pdcd35-ic4-ampm2@9022:pdcd35-ic4-ampm3@9023:pdcd35-ic4-ampm4@9024 ndcd35-icb4:ndcd35-icb4-ampm1@9021:ndcd35-icb4-ampm2@9022:ndcd35-icb4-ampm3@9023:ndcd35-icb4-ampm4@9024 pdcd35-ic5:pdcd35-ic5-ampm1@9021:pdcd35-ic5-ampm2@9022:pdcd35-ic5-ampm3@9023:pdcd35-ic5-ampm4@9024 ndcd35-icb5:ndcd35-icb5-ampm1@9021:ndcd35-icb5-ampm2@9022:ndcd35-icb5-ampm3@9023:ndcd35-icb5-ampm4@9024 pdcd35-ic6:pdcd35-ic6-ampm1@9021:pdcd35-ic6-ampm2@9022:pdcd35-ic6-ampm3@9023:pdcd35-ic6-ampm4@9024 ndcd35-icb6:ndcd35-icb6-ampm1@9021:ndcd35-icb6-ampm2@9022:ndcd35-icb6-ampm3@9023:ndcd35-icb6-ampm4@9024 pdcd35-ic3:pdcd35-ic3-bgp1@9087:pdcd35-ic3-ospf1@9092 ndcd35-icb3:ndcd35-icb3-bgp1@9087:ndcd35-icb3-ospf1@9092 pdcd35-ic7:pdcd35-ic7-mplsa1@9031:pdcd35-ic7-mplsm1@9048:pdcd35-ic7-mplst1@9082 ndcd35-icb7:ndcd35-icb7-mplsa1@9031:ndcd35-icb7-mplsm1@9048:ndcd35-icb7-mplst1@9082, pdcd35-ic3:pdcd35-ic3-oi1@9006 ndcd35-icb3:ndcd35-icb3-oi1@9006,, pdcc01-sis3: ndcc01-sisb3:, ndcd35-cnhca1:, pdcd35-snmcpe1:pdcd35-snmcpe1-syslog1@9036 ndcd35-snmcpeb1:ndcd35-snmcpeb1-syslog1@9036, pdcd35-snmcpe1:pdcd35-snmcpe1-dm1@9026:pdcd35-snmcpe1-bgpdm1@9027:pdcd35-snmcpe1-ospfdm1@9028 ndcd35-snmcpeb1:ndcd35-snmcpeb1-dm1@9026:ndcd35-snmcpeb1-bgpdm1@9027:ndcd35-snmcpeb1-ospfdm1@9028, pdcd35-ic3:pdcd35-ic3-voip1@9041 ndcd35-icb3:ndcd35-icb3-voip1@9041'
+DOMAIN[39]='ndcd39-samb1:ndcd39-samb1-sam1@9005 ndcd39-samb1:ndcd39-samb1-xda1@9097, ndcd39-icb1:ndcd39-icb1-ampm1@9021:ndcd39-icb1-ampm2@9022 ndcd39-samb1:ndcd39-samb1-bgp1@9087:ndcd39-samb1-ospf1@9092, ndcd39-samb1:ndcd39-samb1-oi1@9006,, ndcd39-samb1:,, ndcd39-snmcpe1:ndcd39-snmcpe1-syslog1@9036, ndcd39-snmcpe1:ndcd39-snmcpe1-dm1@9026:ndcd39-snmcpe1-bgpdm1@9027:ndcd39-snmcpe1-ospfdm1@9028, ndcd39-samb1:ndcd39-samb1-voip1@9041'
+# Dev systems (td56p-td58p)
+DOMAIN[456]='pdctd3-ic1:pdctd3-ic1-sam1@9005 pdctd3-ic1:pdctd3-ic1-xda1@9097, pdctd3-ic1:pdctd3-ic1-ampm1@9021 pdctd3-ic1:pdctd3-ic1-bgp1@9087:pdctd3-ic1-ospf1@9092:pdctd3-ic1-acm1@9016 pdctd3-ic1:pdctd3-ic1-mplsa1@9031:pdctd3-ic1-mplsm1@9048:pdctd3-ic1-mplst1@9082, pdctd3-ic1:pdctd3-ic1-oi1@9006,,,, pdctd3-ic1:pdctd3-ic1-syslog1@9036, pdctd3-ic1:pdctd3-ic1-dm1@9026, pdctd3-ic1:pdctd3-ic1-voip1@9041'
+DOMAIN[457]='ndctd3-icb1:ndctd3-icb1-sam1@9005 ndctd3-icb1:ndctd3-icb1-xda1@9097, ndctd3-icb1:ndctd3-icb1-ampm1@9021 ndctd3-icb1:ndctd3-icb1-bgp1@9087:ndctd3-icb1-ospf1@9092:ndctd3-icb1-acm1@9016 ndctd3-icb1:ndctd3-icb1-mplsa1@9031:ndctd3-icb1-mplsm1@9048:ndctd3-icb1-mplst1@9082, ndctd3-icb1:ndctd3-icb1-oi1@9006,,,, ndctd3-icb1:ndctd3-icb1-syslog1@9036, ndctd3-icb1:ndctd3-icb1-dm1@9026, ndctd3-icb1:ndctd3-icb1-voip1@9041'
+DOMAIN[458]='ndctd3-icb2:ndctd3-icb2-sam1@9005 ndctd3-icb2:ndctd3-icb2-xda1@9097, ndctd3-icb2:ndctd3-icb2-ampm1@9021 ndctd3-icb2:ndctd3-icb2-bgp1@9087:ndctd3-icb2-ospf1@9092:ndctd3-icb2-acm1@9016 ndctd3-icb2:ndctd3-icb2-mplsa1@9031:ndctd3-icb2-mplsm1@9048:ndctd3-icb2-mplst1@9082, ndctd3-icb2:ndctd3-icb2-oi1@9006,,,, ndctd3-icb2:ndctd3-icb2-syslog1@9036, ndctd3-icb2:ndctd3-icb2-dm1@9026, ndctd3-icb2:ndctd3-icb2-voip1@9041'
+# Production-Like Test Env (td59p)
+DOMAIN[459]='ndctc1-samb1:ndctc1-samb1-sam1@9005 ndctc1-samb2:ndctc1-samb2-sam1@9005 ndctc1-samb1:ndctc1-samb1-xda1@9097 ndctc1-samb2:ndctc1-samb2-xda1@9097, ndctc4-samb1:ndctc4-samb1-ampm1@9021:ndctc4-samb1-ampm2@9022 ndctc2-samb1:ndctc2-samb1-ampm1@9021:ndctc2-samb1-ampm2@9022 ndctc1-samb1:ndctc1-samb1-bgp1@9087:ndctc1-samb1-ospf1@9092 ndctc1-samb2:ndctc1-samb2-bgp1@9087:ndctc1-samb2-ospf1@9092 ndctc4-samb1:ndctc4-samb1-mplsa1@9031:ndctc4-samb1-mplsm1@9048:ndctc4-samb1-mplst1@9082 ndctc2-samb1:ndctc2-samb1-mplsa1@9031:ndctc2-samb1-mplsm1@9048:ndctc2-samb1-mplst1@9082, ndctc1-samb1:ndctc1-samb1-oi1@9006 ndctc1-samb2:ndctc1-samb2-oi1@9006,,pdctc1-sam1:,, ndctc1-xdb1:ndctc1-xdb1-syslog1@9036 ndctc2-xdb1:ndctc2-xdb1-syslog1@9036, ndctc4-samb1:ndctc4-samb1-dm1@9026 ndctc2-samb1:ndctc2-samb1-dm1@9026, ndctc1-samb1:ndctc1-samb1-voip1@9041 ndctc1-samb2:ndctc1-samb2-voip1@9041'
+# System Test (td60p-td67p)
+DOMAIN[460]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctd60-ic1:pdctd60-ic1-sam1@9005 pdctd60-ic1:pdctd60-ic1-xda1@9097, pdctd60-ic1:pdctd60-ic1-ampm1@9021 pdctd60-ic1:pdctd60-ic1-bgp1@9087:pdctd60-ic1-ospf1@9092:pdctd60-ic1-acm1@9016 pdctd60-ic1:pdctd60-ic1-mplsa1@9031:pdctd60-ic1-mplsm1@9048:pdctd60-ic1-mplst1@9082, pdctd60-ic1:pdctd60-ic1-oi1@9006,, pdctc2-sam1:, ndcteh02:, pdctd60-ic1:, pdctd60-ic1:pdctd60-ic1-dm1@9026, pdctd60-ic1:pdctd60-ic1-voip1@9041'
+DOMAIN[461]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctd61-ic1:pdctd61-ic1-sam1@9005 pdctd61-ic1:pdctd61-ic1-xda1@9097, pdctd61-ic1:pdctd61-ic1-ampm1@9021 pdctd61-ic1:pdctd61-ic1-bgp1@9087:pdctd61-ic1-ospf1@9092:pdctd61-ic1-acm1@9016 pdctd61-ic1:pdctd61-ic1-mplsa1@9031:pdctd61-ic1-mplsm1@9048:pdctd61-ic1-mplst1@9082, pdctd61-ic1:pdctd61-ic1-oi1@9006,, pdctc2-sam1:, ndcteh02:, pdctd61-ic1:, pdctd61-ic1:pdctd61-ic1-dm1@9026, pdctd61-ic1:pdctd61-ic1-voip1@9041'
+DOMAIN[462]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctd62-ic1:pdctd62-ic1-sam1@9005 pdctd62-ic1:pdctd62-ic1-xda1@9097, pdctd62-ic1:pdctd62-ic1-ampm1@9021 pdctd62-ic1:pdctd62-ic1-bgp1@9087:pdctd62-ic1-ospf1@9092:pdctd62-ic1-acm1@9016 pdctd62-ic1:pdctd62-ic1-mplsa1@9031:pdctd62-ic1-mplsm1@9048:pdctd62-ic1-mplst1@9082, pdctd62-ic1:pdctd62-ic1-oi1@9006,, pdctc2-sam1:, ndcteh12:, pdctd62-ic1:, pdctd62-ic1:pdctd62-ic1-dm1@9026, pdctd62-ic1:pdctd62-ic1-voip1@9041'
+DOMAIN[463]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctd63-ic1:pdctd63-ic1-sam1@9005 pdctd63-ic1:pdctd63-ic1-xda1@9097, pdctd63-ic1:pdctd63-ic1-ampm1@9021 pdctd63-ic1:pdctd63-ic1-bgp1@9087:pdctd63-ic1-ospf1@9092:pdctd63-ic1-acm1@9016 pdctd63-ic1:pdctd63-ic1-mplsa1@9031:pdctd63-ic1-mplsm1@9048:pdctd63-ic1-mplst1@9082, pdctd63-ic1:pdctd63-ic1-oi1@9006,, pdctc2-sam1:, pdctd63-cnh2:, pdctd63-ic1:, pdctd63-ic1:pdctd63-ic1-dm1@9026, pdctd63-ic1:pdctd63-ic1-voip1@9041'
+DOMAIN[464]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctd64-ic1:pdctd64-ic1-sam1@9005 pdctd64-ic1:pdctd64-ic1-xda1@9097, pdctd64-ic1:pdctd64-ic1-ampm1@9021 pdctd64-ic1:pdctd64-ic1-bgp1@9087:pdctd64-ic1-ospf1@9092:pdctd64-ic1-acm1@9016 pdctd64-ic1:pdctd64-ic1-mplsa1@9031:pdctd64-ic1-mplsm1@9048:pdctd64-ic1-mplst1@9082, pdctd64-ic1:pdctd64-ic1-oi1@9006,, pdctc2-sam1:, pdctd64-cnh2:, pdctd64-ic1:, pdctd64-ic1:pdctd64-ic1-dm1@9026, pdctd64-ic1:pdctd64-ic1-voip1@9041'
+DOMAIN[465]='pdctd65-ic1:pdctd65-ic1-sam1@9005 pdctd65-ic1:pdctd65-ic1-xda1@9097, pdctd65-ic1:pdctd65-ic1-ampm1@9021 pdctd65-ic1:pdctd65-ic1-bgp1@9087:pdctd65-ic1-ospf1@9092:pdctd65-ic1-acm1@9016 ndctd3-icb1:ndctd3-icb1-esm1@9076 pdctd65-ic1:pdctd65-ic1-mplsa1@9031:pdctd65-ic1-mplsm1@9048:pdctd65-ic1-mplst1@9082, pdctd65-ic1:pdctd65-ic1-oi1@9006,, pdctc2-sam1:, ndcteh13:, pdctd65-ic1:, pdctd65-ic1:pdctd65-ic1-dm1@9026, pdctd65-ic1:pdctd65-ic1-voip1@9041'
+DOMAIN[466]='pdctd66-ic1:pdctd66-ic1-sam1@9005 pdctd66-ic1:pdctd66-ic1-xda1@9097, pdctd66-ic1:pdctd66-ic1-ampm1@9021 pdctd66-ic1:pdctd66-ic1-bgp1@9087:pdctd66-ic1-ospf1@9092:pdctd66-ic1-acm1@9016 ndctd3-icb1:ndctd3-icb1-esm2@9077 pdctd66-ic1:pdctd66-ic1-mplsa1@9031:pdctd66-ic1-mplsm1@9048:pdctd66-ic1-mplst1@9082, pdctd66-ic1:pdctd66-ic1-oi1@9006,, pdctc2-sam1:, pdctd66-cnh2:, pdctd66-ic1:, pdctd66-ic1:pdctd66-ic1-dm1@9026, pdctd66-ic1:pdctd66-ic1-voip1@9041'
+DOMAIN[467]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctd67-ic1:pdctd67-ic1-sam1@9005 pdctd67-ic1:pdctd67-ic1-xda1@9097, pdctd67-ic1:pdctd67-ic1-ampm1@9021 pdctd67-ic1:pdctd67-ic1-bgp1@9087:pdctd67-ic1-ospf1@9092:pdctd67-ic1-acm1@9016 pdctd67-ic1:pdctd67-ic1-mplsa1@9031:pdctd67-ic1-mplsm1@9048:pdctd67-ic1-mplst1@9082, pdctd67-ic1:pdctd67-ic1-oi1@9006,, pdctc2-sam1:, pdctd67-cnh2:, pdctd67-ic1:, pdctd67-ic1:pdctd67-ic1-dm1@9026, pdctd67-ic1:pdctd67-ic1-voip1@9041'
+
+# UAT (td60n-td67n)
+DOMAIN[560]='pdctc1-sam1:pdctc1-sam1-sam1@9005 ndctd60-icb1:ndctd60-icb1-sam1@9005 ndctd60-icb1:ndctd60-icb1-xda1@9097, ndctd60-icb1:ndctd60-icb1-ampm1@9021 ndctd60-icb1:ndctd60-icb1-bgp1@9087:ndctd60-icb1-ospf1@9092:ndctd60-icb1-acm1@9016 ndctd60-icb1:ndctd60-icb1-mplsa1@9031:ndctd60-icb1-mplsm1@9048:ndctd60-icb1-mplst1@9082, ndctd60-icb1:ndctd60-icb1-oi1@9006,, pdctc1-sam1:, ndcteh03:, ndctd60-icb1:, ndctd60-icb1:ndctd60-icb1-dm1@9026, ndctd60-icb1:ndctd60-icb1-voip1@9041'
+DOMAIN[561]='pdctc1-sam1:pdctc1-sam1-sam1@9005 ndctd61-icb1:ndctd61-icb1-sam1@9005 ndctd61-icb1:ndctd61-icb1-xda1@9097, ndctd61-icb1:ndctd61-icb1-ampm1@9021 ndctd61-icb1:ndctd61-icb1-bgp1@9087:ndctd61-icb1-ospf1@9092:ndctd61-icb1-acm1@9016 ndctd61-icb1:ndctd61-icb1-mplsa1@9031:ndctd61-icb1-mplsm1@9048:ndctd61-icb1-mplst1@9082, ndctd61-icb1:ndctd61-icb1-oi1@9006,, pdctc1-sam1:, ndcteh14:, ndctd61-icb1:, ndctd61-icb1:ndctd61-icb1-dm1@9026, ndctd61-icb1:ndctd61-icb1-voip1@9041'
+DOMAIN[562]='pdctc1-sam1:pdctc1-sam1-sam1@9005 ndctd62-icb1:ndctd62-icb1-sam1@9005 ndctd62-icb1:ndctd62-icb1-xda1@9097, ndctd62-icb1:ndctd62-icb1-ampm1@9021 ndctd62-icb1:ndctd62-icb1-bgp1@9087:ndctd62-icb1-ospf1@9092:ndctd62-icb1-acm1@9016 ndctd62-icb1:ndctd62-icb1-mplsa1@9031:ndctd62-icb1-mplsm1@9048:ndctd62-icb1-mplst1@9082, ndctd62-icb1:ndctd62-icb1-oi1@9006,, pdctc1-sam1:, ndcteh15:, ndctd62-icb1:, ndctd62-icb1:ndctd62-icb1-dm1@9026, ndctd62-icb1:ndctd62-icb1-voip1@9041'
+DOMAIN[563]='pdctc1-sam1:pdctc1-sam1-sam1@9005 ndctd63-icb1:ndctd63-icb1-sam1@9005 ndctd63-icb1:ndctd63-icb1-xda1@9097, ndctd63-icb1:ndctd63-icb1-ampm1@9021:ndctd63-icb1-ampm2@9022 ndctd63-icb1:ndctd63-icb1-bgp1@9087:ndctd63-icb1-ospf1@9092:ndctd63-icb1-acm1@9016 ndctd63-icb1:ndctd63-icb1-mplsa1@9031:ndctd63-icb1-mplsm1@9048:ndctd63-icb1-mplst1@9082, ndctd63-icb1:ndctd63-icb1-oi1@9006,, pdctc1-sam1:, ndctd63-cnh1:, ndctd63-icb1:, ndctd63-icb1:ndctd63-icb1-dm1@9026, ndctd63-icb1:ndctd63-icb1-voip1@9041'
+DOMAIN[564]='pdctc1-sam1:pdctc1-sam1-sam1@9005 ndctd64-icb1:ndctd64-icb1-sam1@9005 ndctd64-icb1:ndctd64-icb1-xda1@9097, ndctd64-icb1:ndctd64-icb1-ampm1@9021 ndctd64-icb1:ndctd64-icb1-bgp1@9087:ndctd64-icb1-ospf1@9092:ndctd64-icb1-acm1@9016 ndctd64-icb1:ndctd64-icb1-mplsa1@9031:ndctd64-icb1-mplsm1@9048:ndctd64-icb1-mplst1@9082, ndctd64-icb1:ndctd64-icb1-oi1@9006,, pdctc1-sam1:, ndctd64-cnh1:, ndctd64-icb1:, ndctd64-icb1:ndctd64-icb1-dm1@9026, ndctd64-icb1:ndctd64-icb1-voip1@9041'
+DOMAIN[565]='ndctd65-icb1:ndctd65-icb1-sam1@9005 ndctd65-icb1:ndctd65-icb1-xda1@9097, ndctd65-icb1:ndctd65-icb1-ampm1@9021 ndctd65-icb1:ndctd65-icb1-bgp1@9087:ndctd65-icb1-ospf1@9092:ndctd65-icb1-acm1@9016 ndctd3-icb1:ndctd3-icb1-esm3@9078 ndctd65-icb1:ndctd65-icb1-mplsa1@9031:ndctd65-icb1-mplsm1@9048:ndctd65-icb1-mplst1@9082, ndctd65-icb1:ndctd65-icb1-oi1@9006,, pdctc1-sam1:, ndcteh16:, ndctd65-icb1:, ndctd65-icb1:ndctd65-icb1-dm1@9026, ndctd65-icb1:ndctd65-icb1-voip1@9041'
+DOMAIN[566]='ndctd66-icb1:ndctd66-icb1-sam1@9005 ndctd66-icb1:ndctd66-icb1-xda1@9097, ndctd66-icb1:ndctd66-icb1-ampm1@9021 ndctd66-icb1:ndctd66-icb1-bgp1@9087:ndctd66-icb1-ospf1@9092:ndctd66-icb1-acm1@9016 ndctd3-icb1:ndctd3-icb1-esm4@9079 ndctd66-icb1:ndctd66-icb1-mplsa1@9031:ndctd66-icb1-mplsm1@9048:ndctd66-icb1-mplst1@9082, ndctd66-icb1:ndctd66-icb1-oi1@9006,, pdctc1-sam1:, ndctd66-cnh1:, ndctd66-icb1:, ndctd66-icb1:ndctd66-icb1-dm1@9026, ndctd66-icb1:ndctd66-icb1-voip1@9041'
+DOMAIN[567]='pdctc1-sam1:pdctc1-sam1-sam1@9005 ndctd67-icb1:ndctd67-icb1-sam1@9005 ndctd67-icb1:ndctd67-icb1-xda1@9097, ndctd67-icb1:ndctd67-icb1-ampm1@9021 ndctd67-icb1:ndctd67-icb1-bgp1@9087:ndctd67-icb1-ospf1@9092:ndctd67-icb1-acm1@9016 ndctd67-icb1:ndctd67-icb1-mplsa1@9031:ndctd67-icb1-mplsm1@9048:ndctd67-icb1-mplst1@9082, ndctd67-icb1:ndctd67-icb1-oi1@9006,, pdctc1-sam1:, ndctd67-cnh1:, ndctd67-icb1:, ndctd67-icb1:ndctd67-icb1-dm1@9026, ndctd67-icb1:ndctd67-icb1-voip1@9041'
+
+# LSE BACKUP SYSTEMS (511)
+DOMAIN[511]='lsed11-sam1:lsed11-sam1-sam1@9005 lsed11-sam1:lsed11-sam1-xda1@9097, lsed11-ic1:lsed11-ic1-am1@9011 lsed11-ic1:lsed11-ic1-bgp1@@9087:lsed11-ic1-ospf1@9092, lsed11-ic1:lsed11-ic1-oi1@9006,,,, lsed11-ic1:,, lsed11-ic1:lsed11-ic1-voip1@9041'
+DOMAIN[512]='pdctc2-sam1:pdctc2-sam1-sam1@9005 pdctc1-sam1:pdctc1-sam1-sam1@9005, ndctd2-icb1:ndctd2-icb1-ampm1@9021, ndctd2-icb1:ndctd2-icb1-oi1@9006,,pdctc2-sam1: pdctc1-sam1:,,, ndctd2-icb1:ndctd2-icb1-dm1@9026, ndctd2-icb1:ndctd2-icb1-voip1@9041,'
+
+##
+## DEV/Test Systems
+##
+ 
+####
+# NASDAQ RICHARDSON LAB (516)
+####
+DOMAIN[516]='rchtd16-sam1:rchtd16-sam1-sam1@9005:rchtd16-sam1-sam2@9004, rchtd16-ic1:rchtd16-ic1-ampm1@9021, rchtd16-oi1:rchtd16-oi1-oi1@9006,,, rchtd16-cnh1:, rchtd16-snmcpeb2:rchtd16-snmcpeb2-syslog@9006,'
+
+# TD22 Networx Test Domain
+DOMAIN[522]=', pdctd22-ic1:pdctd22-ic1-am1@9011:pdctd22-ic1-am2@9012 ndctd22-icb1:ndctd22-icb1-am1@9011:ndctd22-icb1-am2@9012, pdctd22-ic2:pdctd22-ic2-oi1@9006 ndctd22-icb2:ndctd22-icb2-oi1@9006,, pdcc02-sis2: ndcc02-sisb2:, pdctd22-cnh1: pdctd22-cp1:, pdctd22-snmcpe1: ndctd22-snmcpeb1:, ndctd22-icb1:ndctd22-icb1-dm1@9026, pdctd22-ic2:pdctd22-ic2-voip1@9041 ndctd22-icb2:ndctd22-icb2-voip1@9041'
+
+# Paul's Test Domain
+DOMAIN[523]='caytc01-sam1:caytc01-sam1-sam1@9005 caytc01-sam1:caytc01-sam1-xda1@9097, caytd01-ic1:caytd01-ic1-ampm1@9026:caytd01-ic1-ampm2@9027, caytd01-oi1:caytd01-oi1-oi1@9006,,,,,,caytd01-oi1:caytd01-oi1-voip1@9041'
+
+####
+# IMPACT PRIME (552)
+####
+DOMAIN[552]='pdctd52-sam1:pdctd52-sam1-sam1@9005:pdctd52-sam1-sam2@9004, pdctd52-ic1:pdctd52-ic1-ampm1@9021 pdctd52-ic1:pdctd52-ic1-mplsa1@9031:pdctd52-ic1-mplsm1@9048:pdctd52-ic1-mplst1@9082, pdctd52-ic1:pdctd52-ic1-oi1@9006,, pdctd52-sam1: pdctd52-ic1:, pdctd52-cnh1:, ndctc1-espp1:ndctc1-espp1-syslog@9036, pdctd52-ic1:pdctd52-ic1-dm1@9026, pdctd52-ic1:pdctd52-ic1-voip1@9041'
+
+DOMAIN[553]='pdctd52-sam2:pdctd52-sam2-sam1@9005:pdctd52-sam2-sam2@9004, ndctd52-icb2:ndctd52-icb2-ampm1@9021 ndctd52-icb2:ndctd52-icb2-mplsa1@9031:ndctd52-icb2-mplsm1@9048:ndctd52-icb2-mplst1@9082, ndctd52-icb2:ndctd52-icb2-oi1@9006,, pdctd52-sam2: ndctd52-icb2:, pdctd52-cnh2:, ndctc1-espp2:ndctc1-espp2-syslog@9036, ndctd52-icb2:ndctd52-icb2-dm1@9026, ndctd52-icb2:ndctd52-icb2-voip1@9041'
+
+CDOM[1]="d01.mso.mci.com"
+CDOM[2]="d02.mso.mci.com"
+CDOM[3]="d03.mso.mci.com"
+CDOM[4]="d04.mso.mci.com"
+CDOM[5]="d05.mso.mci.com"
+CDOM[6]="d06.mso.mci.com"
+CDOM[7]="d07.mso.mci.com"
+CDOM[8]="d08.mso.mci.com"
+CDOM[9]="d09.mso.mci.com"
+CDOM[10]="d10.mso.mci.com"
+CDOM[11]="d11.mso.mci.com"
+CDOM[12]="d12.mso.mci.com"
+CDOM[13]="d13.mso.mci.com"
+CDOM[14]="d14.mso.mci.com"
+CDOM[15]="d15.mso.mci.com"
+CDOM[16]="d16.mso.mci.com"
+CDOM[17]="d17.mso.mci.com"
+CDOM[18]="d18.mso.mci.com"
+CDOM[20]="d20.mso.mci.com"
+CDOM[21]="d21.mso.mci.com"
+CDOM[22]="d22.mso.mci.com"
+CDOM[23]="d23.mso.mci.com"
+CDOM[24]="d24.mso.mci.com"
+CDOM[25]="d25.mso.mci.com"
+CDOM[26]="d26.mso.mci.com"
+CDOM[27]="d27.mso.mci.com"
+CDOM[28]="d28.mso.mci.com"
+CDOM[30]="d30.mso.mci.com"
+CDOM[31]="d31.mso.mci.com"
+CDOM[32]="d32.mso.mci.com"
+CDOM[33]="d33.mso.mci.com"
+CDOM[34]="d34.mso.mci.com"
+CDOM[35]="d35.mso.mci.com"
+CDOM[39]="d39.mso.mci.com"
+CDOM[456]="td56p.mso.mci.com"
+CDOM[457]="td57p.mso.mci.com"
+CDOM[458]="td58p.mso.mci.com"
+CDOM[459]="td59p.mso.mci.com"
+CDOM[460]="td60p.mso.mci.com"
+CDOM[461]="td61p.mso.mci.com"
+CDOM[462]="td62p.mso.mci.com"
+CDOM[463]="td63p.mso.mci.com"
+CDOM[464]="td64p.mso.mci.com"
+CDOM[465]="td65p.mso.mci.com"
+CDOM[466]="td66p.mso.mci.com"
+CDOM[467]="td67p.mso.mci.com"
+CDOM[511]="d11.mso.mci.com"
+CDOM[512]="td51.mso.mci.com"
+CDOM[516]="td16.mso.mci.com"
+CDOM[522]="td22.mso.mci.com"
+CDOM[523]="TDPAUL.mso.mci.com"
+CDOM[552]="td52.mso.mci.com"
+CDOM[553]="td52.mso.mci.com"
+CDOM[560]="td60n.mso.mci.com"
+CDOM[561]="td61n.mso.mci.com"
+CDOM[562]="td62n.mso.mci.com"
+CDOM[563]="td63n.mso.mci.com"
+CDOM[564]="td64n.mso.mci.com"
+CDOM[565]="td65n.mso.mci.com"
+CDOM[566]="td66n.mso.mci.com"
+CDOM[567]="td67n.mso.mci.com"
+
+# Set the email addresses per domain
+
+EMAIL[1]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[2]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[3]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[4]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[5]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[6]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[7]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[8]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[9]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[10]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[11]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[12]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[13]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[14]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[15]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[16]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[17]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[18]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[20]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[21]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[22]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[23]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[24]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[25]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[26]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[27]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[28]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[30]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[31]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[32]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[33]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[34]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[35]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[39]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support@lists.verizonbusiness.com mnso_sys_2nd@lists.verizonbusiness.com"
+EMAIL[456]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[457]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[458]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[459]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[460]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[461]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[462]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[463]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[464]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[465]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[466]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[467]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[511]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[512]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com  tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[516]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[522]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[523]=" paul.moore@verizonbusiness.com ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[552]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[553]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[560]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[561]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[562]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[563]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[564]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[565]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[566]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+EMAIL[567]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+
+# Email addresses per domain to route to paging device(s)
+
+PAGE[1]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[2]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[3]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[4]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[5]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[6]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[7]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[8]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[9]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[10]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[11]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[12]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[13]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[14]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[15]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[16]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[17]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[18]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[20]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[21]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[22]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[23]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[24]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[25]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[26]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[27]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[28]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[30]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[31]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[32]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[33]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[34]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[35]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[39]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com mnso_sys_support_page@lists.verizonbusiness.com"
+PAGE[456]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[457]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[458]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[459]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[460]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[461]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[462]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[463]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[464]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[465]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[466]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[467]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[511]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[512]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com  tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[516]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[522]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[523]=" paul.moore@verizonbusiness.com ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[552]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[553]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[560]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[561]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[562]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[563]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[564]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[565]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[566]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+PAGE[567]=" ken.persson@verizonbusiness.com anand.shah@verizonbusiness.com tony.dworznicki@verizonbusiness.com jack.westerhoff@verizonbusiness.com"
+
+#######################################################
+
+OI_DNS[1]="pdcd01-snmcpe1"
+OIB1_DNS[1]="ndcd01-snmcpeb1"
+OI_DNS[2]="pdcd02-snmcpe1"
+OIB1_DNS[2]="ndcd02-snmcpeb1"
+OI_DNS[3]="pdcd03-snmcpe1"
+OIB1_DNS[3]="ndcd03-snmcpeb1"
+OI_DNS[4]="pdcd04-snmcpe1"
+OIB1_DNS[4]="ndcd04-snmcpeb1"
+OI_DNS[5]="pdcd05-snmcpe1"
+OIB1_DNS[5]="ndcd05-snmcpeb1"
+OI_DNS[6]="pdcd06-snmcpe1"
+OIB1_DNS[6]="ndcd06-snmcpeb1"
+OI_DNS[7]="pdcd07-snmcpe1"
+OIB1_DNS[7]="ndcd07-snmcpeb1"
+OI_DNS[8]="pdcd08-snmcpe1"
+OIB1_DNS[8]="ndcd08-snmcpeb1"
+OI_DNS[9]="pdcd09-snmcpe1"
+OIB1_DNS[9]="ndcd09-snmcpeb1"
+OI_DNS[10]="pdcd10-snmcpe1"
+OIB1_DNS[10]="ndcd10-snmcpeb1"
+OI_DNS[11]="pdcd11-snmcpe1"
+OIB1_DNS[11]="ndcd11-snmcpeb1"
+OI_DNS[12]="pdcd12-snmcpe1"
+OIB1_DNS[12]="ndcd12-snmcpeb1"
+OI_DNS[13]="pdcd13-snmcpe1"
+OIB1_DNS[13]="ndcd13-snmcpeb1"
+OI_DNS[14]="pdcd14-snmcpe1"
+OIB1_DNS[14]="pdcd14-snmcpeb1"
+OI_DNS[15]="pdcd15-snmcpe1"
+OIB1_DNS[15]="ndcd15-snmcpeb1"
+OI_DNS[16]="pdcd16-snmcpe1"
+OIB1_DNS[16]="ndcd16-snmcpeb1"
+OI_DNS[17]="pdcd17-snmcpe1"
+OIB1_DNS[17]="ndcd17-snmcpeb1"
+OI_DNS[18]="pdcd18-snmcpe1"
+OIB1_DNS[18]="ndcd18-snmcpeb1"
+OI_DNS[20]="pdcd20-snmcpe1"
+OIB1_DNS[20]="ndcd20-snmcpeb1"
+OI_DNS[21]="pdcd21-snmcpe1"
+OIB1_DNS[21]="ndcd21-snmcpeb1"
+OI_DNS[22]="pdcd22-snmcpe1"
+OIB1_DNS[22]="ndcd22-snmcpeb1"
+OI_DNS[23]="pdcd23-snmcpe1"
+OIB1_DNS[23]="ndcd23-snmcpeb1"
+OI_DNS[24]="pdcd24-snmcpe1"
+OIB1_DNS[24]="ndcd24-snmcpeb1"
+OI_DNS[25]="pdcd25-snmcpe1"
+OIB1_DNS[25]="ndcd25-snmcpeb1"
+OI_DNS[26]="pdcd26-snmcpe1"
+OIB1_DNS[26]="ndcd26-snmcpeb1"
+OI_DNS[27]="pdcd27-snmcpe1"
+OIB1_DNS[27]="ndcd27-snmcpeb1"
+OI_DNS[28]="pdcd28-snmcpe1"
+OIB1_DNS[28]="ndcd28-snmcpeb1"
+OI_DNS[30]="pdcd30-snmcpe1"
+OIB1_DNS[30]="ndcd30-snmcpeb1"
+OI_DNS[31]="pdcd31-snmcpe1"
+OIB1_DNS[31]="ndcd31-snmcpeb1"
+OI_DNS[32]="pdcd32-snmcpe1"
+OIB1_DNS[32]="ndcd32-snmcpeb1"
+OI_DNS[33]="pdcd33-snmcpe1"
+OIB1_DNS[33]="ndcd33-snmcpeb1"
+OI_DNS[34]="pdcd34-snmcpe1"
+OIB1_DNS[34]="ndcd34-snmcpeb1"
+OI_DNS[35]="pdcd35-snmcpe1"
+OIB1_DNS[35]="ndcd35-snmcpeb1"
+#OI_DNS[39]="pdcd39-snmcpe1"
+OIB1_DNS[39]="ndcd39-snmcpe1"
+OI_DNS[456]="pdctd3-ic1"
+OIB1_DNS[456]="pdctd3-ic1"
+OI_DNS[457]="ndctd3-icb1"
+OIB1_DNS[457]="ndctd3-icb1"
+OI_DNS[458]="ndctd3-icb2"
+OIB1_DNS[458]="ndctd3-icb2"
+OI_DNS[459]="ndctc1-xdb1"
+OIB1_DNS[459]="ndctc2-xdb1"
+OI_DNS[460]="pdctd60-ic1"
+OIB1_DNS[460]="pdctd60-ic1"
+OI_DNS[461]="pdctd61-ic1"
+OIB1_DNS[461]="pdctd61-ic1"
+OI_DNS[462]="pdctd62-ic1"
+OIB1_DNS[462]="pdctd62-ic1"
+OI_DNS[463]="pdctd63-ic1"
+OIB1_DNS[463]="pdctd63-ic1"
+OI_DNS[464]="pdctd64-ic1"
+OIB1_DNS[464]="pdctd64-ic1"
+OI_DNS[465]="pdctd65-ic1"
+OIB1_DNS[465]="pdctd65-ic1"
+OI_DNS[466]="pdctd66-ic1"
+OIB1_DNS[466]="pdctd66-ic1"
+OI_DNS[467]="pdctd67-ic1"
+OIB1_DNS[467]="pdctd67-ic1"
+OI_DNS[516]="rchtd16-snmcpeb2"
+OIB1_DNS[516]="rchtd16-snmcpeb2"
+OI_DNS[560]="ndctd60-icb1"
+OIB1_DNS[560]="ndctd60-icb1"
+OI_DNS[561]="ndctd61-icb1"
+OIB1_DNS[561]="ndctd61-icb1"
+OI_DNS[562]="ndctd62-icb1"
+OIB1_DNS[562]="ndctd62-icb1"
+OI_DNS[563]="ndctd63-icb1"
+OIB1_DNS[563]="ndctd63-icb1"
+OI_DNS[564]="ndctd64-icb1"
+OIB1_DNS[564]="ndctd64-icb1"
+OI_DNS[565]="ndctd65-icb1"
+OIB1_DNS[565]="ndctd65-icb1"
+OI_DNS[566]="ndctd66-icb1"
+OIB1_DNS[566]="ndctd66-icb1"
+OI_DNS[567]="ndctd67-icb1"
+OIB1_DNS[567]="ndctd67-icb1"
+
+#######################################################
+
+# Here you can [re]define variables tied to a specificeserver.
+# Format is the name of the array (OVRIDE_HOSTS) with the 
+# specific server name assigned to a unique index number 
+# (not already used). The assciated array OVRIDE_CMDS 
+# will use the same index number as OVRIDE_HOSTS, and will have 
+# any variable assignments in single quotes seaparated by 
+# semi-colons.  No need to export your variables here as they will 
+# be exported when processed
+# For example:
+#
+#OVRIDE_HOSTS[0]=cayd01-am1
+#OVRIDE_CMDS[0]='ARCHIVE_DIRS=/var/adm'
+#
+#OVRIDE_HOSTS[1]=cayd03-am1
+#OVRIDE_CMDS[1]='ARCHIVE_DIRS=/var/tmp/adm'
+
+set -A OVRIDE_HOSTS
+set -A OVRIDE_CMDS
+
+# Future home for SAM1
+OVRIDE_HOSTS[1]="undefined-1"
+OVRIDE_CMDS[1]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[2]="pdcc01-sam2"
+OVRIDE_CMDS[2]="SAM_DOMAINS='pdcd15-ic1:pdcd15-ic1-ampm1.rps ndcd15-icb1:ndcd15-icb1-ampm1.rps 9/2 3600, pdcd15-ic1:pdcd15-ic1-ampm2.rps ndcd15-icb1:ndcd15-icb1-ampm2.rps 9/2 3600, pdcd15-ic2:pdcd15-ic2-ampm1.rps ndcd15-icb2:ndcd15-icb2-ampm1.rps 9/2 3600, pdcd15-ic2:pdcd15-ic2-ampm2.rps ndcd15-icb2:ndcd15-icb2-ampm2.rps 9/2 3600, pdcd15-ic2:pdcd15-ic2-ampm3.rps ndcd15-icb2:ndcd15-icb2-ampm3.rps 9/2 3600, pdcd15-ic3:pdcd15-ic3-ampm1.rps ndcd15-icb3:ndcd15-icb3-ampm1.rps 9/2 3600, pdcd15-ic3:pdcd15-ic3-ampm2.rps ndcd15-icb3:ndcd15-icb3-ampm2.rps 9/2 3600, pdcd15-ic4:pdcd15-ic4-ampm1.rps ndcd15-icb4:ndcd15-icb4-ampm1.rps 9/2 3600, pdcd15-ic4:pdcd15-ic4-ampm2.rps ndcd15-icb4:ndcd15-icb4-ampm2.rps 9/2 3600, pdcd15-ic5:pdcd15-ic5-ampm1.rps ndcd15-icb5:ndcd15-icb5-ampm1.rps 9/2 3600'"
+
+OVRIDE_HOSTS[3]="pdcc01-sam3"
+OVRIDE_CMDS[3]="SAM_DOMAINS='pdcd16-ic1:pdcd16-ic1-am1.rps ndcd16-icb1:ndcd16-icb1-am1.rps 9/2 3600'"
+
+OVRIDE_HOSTS[4]="pdcc01-sam4"
+OVRIDE_CMDS[4]="SAM_DOMAINS='pdcd10-ic2:pdcd10-ic2-am1.rps ndcd10-icb2:ndcd10-icb2-am1.rps 9/2 3600, pdcd10-ic2:pdcd10-ic2-am2.rps ndcd10-icb2:ndcd10-icb2-am2.rps 9/2 3600, pdcd17-ic1:pdcd17-ic1-am1.rps ndcd17-icb1:ndcd17-icb1-am1.rps 9/2 3600'"
+
+OVRIDE_HOSTS[5]="pdcc01-sam5"
+OVRIDE_CMDS[5]="SAM_DOMAINS='pdcd05-ic3:pdcd05-ic3-am1.rps ndcd05-icb3:ndcd05-icb3-am1.rps 9/2 3600, pdcd05-ic3:pdcd05-ic3-am2.rps ndcd05-icb3:ndcd05-icb3-am2.rps 9/2 3600, pdcd05-ic3:pdcd05-ic3-am3.rps ndcd05-icb3:ndcd05-icb3-am3.rps 9/2 3600, pdcd05-ic3:pdcd05-ic3-am4.rps ndcd05-icb3:ndcd05-icb3-am4.rps 9/2 3600'"
+
+OVRIDE_HOSTS[6]="pdcc01-sam6"
+OVRIDE_CMDS[6]="SAM_DOMAINS='pdcd20-ic1:pdcd20-ic1-am1.rps ndcd20-icb1:ndcd20-icb1-am1.rps 9/2 3600, pdcd20-ic1:pdcd20-ic1-am2.rps ndcd20-icb1:ndcd20-icb1-am2.rps 9/2 3600, pdcd20-ic2:pdcd20-ic2-am1.rps ndcd20-icb2:ndcd20-icb2-am1.rps 9/2 3600, pdcd20-ic2:pdcd20-ic2-am2.rps ndcd20-icb2:ndcd20-icb2-am2.rps 9/2 3600, pdcd20-ic3:pdcd20-ic3-am1.rps ndcd20-icb3:ndcd20-icb3-am1.rps 9/2 3600, pdcd20-ic3:pdcd20-ic3-am2.rps ndcd20-icb3:ndcd20-icb3-am2.rps 9/2 3600, pdcd20-ic4:pdcd20-ic4-am1.rps ndcd20-icb4:ndcd20-icb4-am1.rps 9/2 3600, pdcd20-ic4:pdcd20-ic4-am2.rps ndcd20-icb4:ndcd20-icb4-am2.rps 9/2 3600, pdcd20-ic5:pdcd20-ic5-am1.rps ndcd20-icb5:ndcd20-icb5-am1.rps 9/2 3600, pdcd20-ic5:pdcd20-ic5-am2.rps ndcd20-icb5:ndcd20-icb5-am2.rps 9/2 3600'"
+
+OVRIDE_HOSTS[7]="pdcc01-sam7"
+OVRIDE_CMDS[7]="SAM_DOMAINS='pdcd15-ic6:pdcd15-ic6-ampm1.rps ndcd15-icb6:ndcd15-icb6-ampm1.rps 9/2 3600, pdcd15-ic6:pdcd15-ic6-ampm2.rps ndcd15-icb6:ndcd15-icb6-ampm2.rps 9/2 3600'"
+
+OVRIDE_HOSTS[8]="pdcd21-sam1"
+OVRIDE_CMDS[8]="SAM_DOMAINS='pdcd21-ic1:pdcd21-ic1-am1.rps ndcd21-icb1:ndcd21-icb1-am1.rps 9/2 3600'"
+
+OVRIDE_HOSTS[9]="pdcc01-sam9"
+OVRIDE_CMDS[9]="SAM_DOMAINS='pdcd08-ic1:pdcd08-ic1-am1.rps ndcd08-icb1:ndcd08-icb1-am1.rps 9/2 3600, pdcd08-ic1:pdcd08-ic1-am2.rps ndcd08-icb1:ndcd08-icb1-am2.rps 9/2 3600, pdcd08-ic2:pdcd08-ic2-am1.rps ndcd08-icb2:ndcd08-icb2-am1.rps 9/2 3600, pdcd08-ic2:pdcd08-ic2-am2.rps ndcd08-icb2:ndcd08-icb2-am2.rps 9/2 3600, pdcd08-ic2:pdcd08-ic2-am3.rps ndcd08-icb2:ndcd08-icb2-am3.rps 9/2 3600, pdcd08-ic4:pdcd08-ic4-am1.rps ndcd08-icb4:ndcd08-icb4-am1.rps 9/2 3600, pdcd08-ic4:pdcd08-ic4-am2.rps ndcd08-icb4:ndcd08-icb4-am2.rps 9/2 3600, pdcd08-ic5:pdcd08-ic5-am1.rps ndcd08-icb5:ndcd08-icb5-am1.rps 9/2 3600, pdcd08-ic5:pdcd08-ic5-am2.rps ndcd08-icb5:ndcd08-icb5-am2.rps 9/2 3600, pdcd08-ic5:pdcd08-ic5-am3.rps ndcd08-icb5:ndcd08-icb5-am3.rps 9/2 3600, pdcd08-ic5:pdcd08-ic5-am4.rps ndcd08-icb5:ndcd08-icb5-am4.rps 9/2 3600'"
+
+OVRIDE_HOSTS[10]="pdcc01-sam10"
+OVRIDE_CMDS[10]="SAM_DOMAINS='pdcd09-ic1:pdcd09-ic1-am1.rps ndcd09-icb1:ndcd09-icb1-am1.rps 9/2 3600, pdcd09-ic1:pdcd09-ic1-am2.rps ndcd09-icb1:ndcd09-icb1-am2.rps 9/2 3600, pdcd09-ic2:pdcd09-ic2-am1.rps ndcd09-icb2:ndcd09-icb2-am1.rps 9/2 3600, pdcd09-ic2:pdcd09-ic2-am2.rps ndcd09-icb2:ndcd09-icb2-am2.rps 9/2 3600, pdcd09-ic4:pdcd09-ic4-am1.rps ndcd09-icb4:ndcd09-icb4-am1.rps 9/2 3600, pdcd09-ic4:pdcd09-ic4-am2.rps ndcd09-icb4:ndcd09-icb4-am2.rps 9/2 3600'"
+
+# SAM11 is empty. Capacity re-allocation later will determine domains that will be attached to SAM11.
+OVRIDE_HOSTS[11]="undefined-11"
+OVRIDE_CMDS[11]="SAM_DOMAINS=''"
+
+# Future home for SAM12
+OVRIDE_HOSTS[12]="undefined-12"
+OVRIDE_CMDS[12]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[13]="pdcc01-sam13"
+OVRIDE_CMDS[13]="SAM_DOMAINS='pdcd13-ic1:pdcd13-ic1-ampm1.rps ndcd13-icb1:ndcd13-icb1-ampm1.rps 9/2 3600, pdcd13-ic1:pdcd13-ic1-ampm2.rps ndcd13-icb1:ndcd13-icb1-ampm2.rps 9/2 3600'"
+
+# Future home for SAM14. D14 will be migrated here later.
+OVRIDE_HOSTS[14]="pdcc01-sam14"
+OVRIDE_CMDS[14]="SAM_DOMAINS='pdcd14-ic1:pdcd14-ic1-ampm1.rps ndcd14-icb1:ndcd14-icb1-ampm1.rps 11/2 3600, pdcd14-ic1:pdcd14-ic1-ampm2.rps ndcd14-icb1:ndcd14-icb1-ampm2.rps 11/2 3600, pdcd14-ic2:pdcd14-ic2-am1.rps pdcd14-icb2:pdcd14-icb2-am1.rps 11/2 3600, pdcd14-ic2:pdcd14-ic2-am2.rps pdcd14-icb2:pdcd14-icb2-am2.rps 11/2 3600,pdcd14-ic2:pdcd14-ic2-am3.rps pdcd14-icb2:pdcd14-icb2-am3.rps 11/2 3600, pdcd14-ic4:pdcd14-ic4-ampm1.rps ndcd14-icb4:ndcd14-icb4-ampm1.rps 11/2 3600, pdcd14-ic4:pdcd14-ic4-ampm2.rps ndcd14-icb4:ndcd14-icb4-ampm2.rps 11/2 3600, pdcd14-ic5:pdcd14-ic5-ampm1.rps ndcd14-icb5:ndcd14-icb5-ampm1.rps 9/2 3600, pdcd14-ic5:pdcd14-ic5-ampm2.rps ndcd14-icb5:ndcd14-icb5-ampm2.rps 9/2 3600, pdcd14-ic5:pdcd14-ic5-ampm3.rps ndcd14-icb5:ndcd14-icb5-ampm3.rps 9/2 3600, pdcd14-ic5:pdcd14-ic5-ampm4.rps ndcd14-icb5:ndcd14-icb5-ampm4.rps 9/2 3600'"
+
+# Future home for SAM15
+OVRIDE_HOSTS[15]="undefined-15"
+OVRIDE_CMDS[15]="SAM_DOMAINS=''"
+
+# Future home for SAM16
+OVRIDE_HOSTS[16]="undefined-16"
+OVRIDE_CMDS[16]="SAM_DOMAINS=''"
+
+# Future home for SAM17
+OVRIDE_HOSTS[17]="undefined-17"
+OVRIDE_CMDS[17]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[18]="pdcc01-sam18"
+OVRIDE_CMDS[18]="SAM_DOMAINS='pdcd18-ic1:pdcd18-ic1-am1.rps ndcd18-icb1:ndcd18-icb1-am1.rps 9/2 3600, pdcd18-ic1:pdcd18-ic1-am2.rps ndcd18-icb1:ndcd18-icb1-am2.rps 9/2 3600, pdcd18-ic2:pdcd18-ic2-am1.rps ndcd18-icb2:ndcd18-icb2-am1.rps 9/2 3600, pdcd18-ic2:pdcd18-ic2-am2.rps ndcd18-icb2:ndcd18-icb2-am2.rps 9/2 3600, pdcd18-ic3:pdcd18-ic3-am1.rps ndcd18-icb3:ndcd18-icb3-am1.rps 9/2 3600, pdcd18-ic3:pdcd18-ic3-am2.rps ndcd18-icb3:ndcd18-icb3-am2.rps 9/2 3600, pdcd18-ic4:pdcd18-ic4-am1.rps ndcd18-icb4:ndcd18-icb4-am1.rps 9/2 3600, pdcd18-ic4:pdcd18-ic4-am2.rps ndcd18-icb4:ndcd18-icb4-am2.rps 9/2 3600, pdcd18-ic6:pdcd18-ic6-am1.rps ndcd18-icb6:ndcd18-icb6-am1.rps 9/2 3600, pdcd18-ic6:pdcd18-ic6-am2.rps ndcd18-icb6:ndcd18-icb6-am2.rps 9/2 3600, pdcd18-ic7:pdcd18-ic7-am1.rps ndcd18-icb7:ndcd18-icb7-am1.rps 9/2 3600, pdcd18-ic7:pdcd18-ic7-am2.rps ndcd18-icb7:ndcd18-icb7-am2.rps 9/2 3600'"
+
+# Future home for SAM19
+OVRIDE_HOSTS[19]="undefined-19"
+OVRIDE_CMDS[19]="SAM_DOMAINS=''"
+
+# Future home for SAM20
+OVRIDE_HOSTS[20]="undefined-20"
+OVRIDE_CMDS[20]="SAM_DOMAINS=''"
+
+# Future home for SAM21
+OVRIDE_HOSTS[21]="undefined-21"
+OVRIDE_CMDS[21]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[22]="pdcc02-sam22"
+OVRIDE_CMDS[22]="SAM_DOMAINS='pdcd22-ic1:pdcd22-ic1-am1.rps ndcd22-icb1:ndcd22-icb1-am1.rps 9/2 3600, pdcd22-ic1:pdcd22-ic1-am2.rps ndcd22-icb1:ndcd22-icb1-am2.rps 9/2 3600, pdcd32-ic1:pdcd32-ic1-am1.rps ndcd32-icb1:ndcd32-icb1-am1.rps 9/2 3600, pdcd32-ic1:pdcd32-ic1-am2.rps ndcd32-icb1:ndcd32-icb1-am2.rps 9/2 3600'"
+
+OVRIDE_HOSTS[23]="pdcc01-sam23"
+OVRIDE_CMDS[23]="SAM_DOMAINS='pdcd23-ic1:pdcd23-ic1-am1.rps ndcd23-icb1:ndcd23-icb1-am1.rps 9/2 3600, pdcd23-ic1:pdcd23-ic1-am2.rps ndcd23-icb1:ndcd23-icb1-am2.rps 9/2 3600, pdcd23-ic2:pdcd23-ic2-am1.rps ndcd23-icb2:ndcd23-icb2-am1.rps 9/2 3600, pdcd23-ic2:pdcd23-ic2-am2.rps ndcd23-icb2:ndcd23-icb2-am2.rps 9/2 3600'"
+
+OVRIDE_HOSTS[24]="pdcc01-sam24"
+OVRIDE_CMDS[24]="SAM_DOMAINS='pdcd24-ic1:pdcd24-ic1-am1.rps ndcd24-icb1:ndcd24-icb1-am1.rps 9/2 3600, pdcd24-ic1:pdcd24-ic1-am2.rps ndcd24-icb1:ndcd24-icb1-am2.rps 9/2 3600'"
+
+OVRIDE_HOSTS[25]="pdcc01-sam25"
+OVRIDE_CMDS[25]="SAM_DOMAINS='pdcd25-ic1:pdcd25-ic1-am1.rps ndcd25-icb1:ndcd25-icb1-am1.rps 9/2 3600, pdcd25-ic1:pdcd25-ic1-am2.rps ndcd25-icb1:ndcd25-icb1-am2.rps 9/2 3600, pdcd25-ic2:pdcd25-ic2-am1.rps ndcd25-icb2:ndcd25-icb2-am1.rps 9/2 3600, pdcd25-ic2:pdcd25-ic2-am2.rps ndcd25-icb2:ndcd25-icb2-am2.rps 9/2 3600, pdcd25-ic4:pdcd25-ic4-am1.rps ndcd25-icb4:ndcd25-icb4-am1.rps 9/2 3600, pdcd25-ic4:pdcd25-ic4-am2.rps ndcd25-icb4:ndcd25-icb4-am2.rps 9/2 3600, pdcd25-ic4:pdcd25-ic4-am3.rps ndcd25-icb4:ndcd25-icb4-am3.rps 9/2 3600, pdcd25-ic4:pdcd25-ic4-am4.rps ndcd25-icb4:ndcd25-icb4-am4.rps 9/2 3600'"
+
+OVRIDE_HOSTS[26]="pdcc01-sam26"
+OVRIDE_CMDS[26]="SAM_DOMAINS='pdcd26-ic1:pdcd26-ic1-am1.rps ndcd26-icb1:ndcd26-icb1-am1.rps 9/2 3600, pdcd26-ic1:pdcd26-ic1-am2.rps ndcd26-icb1:ndcd26-icb1-am2.rps 9/2 3600, pdcd26-ic2:pdcd26-ic2-am1.rps ndcd26-icb2:ndcd26-icb2-am1.rps 9/2 3600, pdcd26-ic2:pdcd26-ic2-am2.rps ndcd26-icb2:ndcd26-icb2-am2.rps 9/2 3600, pdcd26-ic3:pdcd26-ic3-am1.rps ndcd26-icb3:ndcd26-icb3-am1.rps 9/2 3600, pdcd26-ic3:pdcd26-ic3-am2.rps ndcd26-icb3:ndcd26-icb3-am2.rps 9/2 3600, pdcd26-ic4:pdcd26-ic4-am1.rps ndcd26-icb4:ndcd26-icb4-am1.rps 9/2 3600, pdcd26-ic4:pdcd26-ic4-am2.rps ndcd26-icb4:ndcd26-icb4-am2.rps 9/2 3600'"
+
+# Future home for SAM27
+OVRIDE_HOSTS[27]="undefined-27"
+OVRIDE_CMDS[27]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[28]="pdcc01-sam28"
+OVRIDE_CMDS[28]="SAM_DOMAINS='pdcd28-ic1:pdcd28-ic1-ampm1.rps ndcd28-icb1:ndcd28-icb1-ampm1.rps 9/2 3600, pdcd28-ic1:pdcd28-ic1-ampm2.rps ndcd28-icb1:ndcd28-icb1-ampm2.rps 9/2 3600, pdcd28-ic2:pdcd28-ic2-ampm1.rps ndcd28-icb2:ndcd28-icb2-ampm1.rps 9/2 3600'"
+
+# Future home for SAM29
+OVRIDE_HOSTS[29]="undefined-29"
+OVRIDE_CMDS[29]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[30]="pdcd30-sam1"
+OVRIDE_CMDS[30]="SAM_DOMAINS='pdcd30-ic1:pdcd30-ic1-ampm1.rps ndcd30-icb1:ndcd30-icb1-ampm1.rps 9/2 3600, pdcd30-ic1:pdcd30-ic1-ampm2.rps ndcd30-icb1:ndcd30-icb1-ampm2.rps 9/2 3600, pdcd30-ic3:pdcd30-ic3-ampm1.rps ndcd30-icb3:ndcd30-icb3-ampm1.rps 9/2 3600, pdcd30-ic3:pdcd30-ic3-ampm2.rps ndcd30-icb3:ndcd30-icb3-ampm2.rps 9/2 3600, pdcd30-ic4:pdcd30-ic4-ampm1.rps ndcd30-icb4:ndcd30-icb4-ampm1.rps 9/2 3600, pdcd30-ic4:pdcd30-ic4-ampm2.rps ndcd30-icb4:ndcd30-icb4-ampm2.rps 9/2 3600, pdcd30-ic5:pdcd30-ic5-ampm1.rps ndcd30-icb5:ndcd30-icb5-ampm1.rps 9/2 3600, pdcd30-ic5:pdcd30-ic5-ampm2.rps ndcd30-icb5:ndcd30-icb5-ampm2.rps 9/2 3600'"
+
+OVRIDE_HOSTS[31]="pdcd31-sam1"
+OVRIDE_CMDS[31]="SAM_DOMAINS='pdcd31-ic1:pdcd31-ic1-ampm1.rps ndcd31-icb1:ndcd31-icb1-ampm1.rps 9/2 3600, pdcd31-ic1:pdcd31-ic1-ampm2.rps ndcd31-icb1:ndcd31-icb1-ampm2.rps 9/2 3600'"
+
+# Future home for SAM32
+OVRIDE_HOSTS[32]="undefined-32"
+OVRIDE_CMDS[32]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[33]="pdcd33-sam1"
+OVRIDE_CMDS[33]="SAM_DOMAINS='pdcd33-ic1:pdcd33-ic1-ampm1.rps ndcd33-icb1:ndcd33-icb1-ampm1.rps 9/2 3600, pdcd33-ic1:pdcd33-ic1-ampm2.rps ndcd33-icb1:ndcd33-icb1-ampm2.rps 9/2 3600, pdcd33-ic2:pdcd33-ic2-ampm1.rps ndcd33-icb2:ndcd33-icb2-ampm1.rps 9/2 3600, pdcd33-ic2:pdcd33-ic2-ampm2.rps ndcd33-icb2:ndcd33-icb2-ampm2.rps 9/2 3600'"
+
+# Future home for SAM34
+OVRIDE_HOSTS[34]="undefined-34"
+OVRIDE_CMDS[34]="SAM_DOMAINS=''"
+
+# Future home for SAM35
+OVRIDE_HOSTS[35]="undefined-35"
+OVRIDE_CMDS[35]="SAM_DOMAINS=''"
+
+# Future home for SAM36
+OVRIDE_HOSTS[36]="undefined-36"
+OVRIDE_CMDS[36]="SAM_DOMAINS=''"
+
+# Future home for SAM37
+OVRIDE_HOSTS[37]="undefined-37"
+OVRIDE_CMDS[37]="SAM_DOMAINS=''"
+
+# Future home for SAM38
+OVRIDE_HOSTS[38]="undefined-38"
+OVRIDE_CMDS[38]="SAM_DOMAINS=''"
+
+# Future home for SAM39
+OVRIDE_HOSTS[39]="undefined-39"
+OVRIDE_CMDS[39]="SAM_DOMAINS=''"
+
+# Future home for SAM40
+OVRIDE_HOSTS[40]="undefined-40"
+OVRIDE_CMDS[40]="SAM_DOMAINS=''"
+
+# Future home for SAM41
+OVRIDE_HOSTS[41]="undefined-41"
+OVRIDE_CMDS[41]="SAM_DOMAINS=''"
+
+# Future home for SAM42
+OVRIDE_HOSTS[42]="undefined-42"
+OVRIDE_CMDS[42]="SAM_DOMAINS=''"
+
+# Future home for SAM43
+OVRIDE_HOSTS[43]="undefined-43"
+OVRIDE_CMDS[43]="SAM_DOMAINS=''"
+
+# Future home for SAM44
+OVRIDE_HOSTS[44]="undefined-44"
+OVRIDE_CMDS[44]="SAM_DOMAINS=''"
+
+# Future home for SAM45
+OVRIDE_HOSTS[45]="undefined-45"
+OVRIDE_CMDS[45]="SAM_DOMAINS=''"
+
+# Future home for SAM46
+OVRIDE_HOSTS[46]="undefined-46"
+OVRIDE_CMDS[46]="SAM_DOMAINS=''"
+
+# Future home for SAM47
+OVRIDE_HOSTS[47]="undefined-47"
+OVRIDE_CMDS[47]="SAM_DOMAINS=''"
+
+# Future home for SAM48
+OVRIDE_HOSTS[48]="undefined-48"
+OVRIDE_CMDS[48]="SAM_DOMAINS=''"
+
+# Future home for SAM49
+OVRIDE_HOSTS[49]="undefined-49"
+OVRIDE_CMDS[49]="SAM_DOMAINS=''"
+
+# Future home for SAM50
+OVRIDE_HOSTS[50]="undefined-50"
+OVRIDE_CMDS[50]="SAM_DOMAINS=''"
+
+# Future home for SAM51
+OVRIDE_HOSTS[51]="undefined-51"
+OVRIDE_CMDS[51]="SAM_DOMAINS=''"
+
+# Future home for SAM52
+OVRIDE_HOSTS[52]="undefined-52"
+OVRIDE_CMDS[52]="SAM_DOMAINS=''"
+
+# Future home for SAM53
+OVRIDE_HOSTS[53]="undefined-53"
+OVRIDE_CMDS[53]="SAM_DOMAINS=''"
+
+# Future home for SAM54
+OVRIDE_HOSTS[54]="undefined-54"
+OVRIDE_CMDS[54]="SAM_DOMAINS=''"
+
+# Future home for SAM55
+OVRIDE_HOSTS[55]="undefined-55"
+OVRIDE_CMDS[55]="SAM_DOMAINS=''"
+
+# Future home for SAM56
+OVRIDE_HOSTS[56]="undefined-56"
+OVRIDE_CMDS[56]="SAM_DOMAINS=''"
+
+# Future home for SAM57
+OVRIDE_HOSTS[57]="undefined-57"
+OVRIDE_CMDS[57]="SAM_DOMAINS=''"
+
+# Future home for SAM58
+OVRIDE_HOSTS[58]="undefined-58"
+OVRIDE_CMDS[58]="SAM_DOMAINS=''"
+
+# Future home for SAM59
+OVRIDE_HOSTS[59]="undefined-59"
+OVRIDE_CMDS[59]="SAM_DOMAINS=''"
+
+# Future home for SAM60
+OVRIDE_HOSTS[60]="undefined-60"
+OVRIDE_CMDS[60]="SAM_DOMAINS=''"
+
+# Future home for SAM61
+OVRIDE_HOSTS[61]="undefined-61"
+OVRIDE_CMDS[61]="SAM_DOMAINS=''"
+
+# Future home for SAM62
+OVRIDE_HOSTS[62]="undefined-62"
+OVRIDE_CMDS[62]="SAM_DOMAINS=''"
+
+# Future home for SAM63
+OVRIDE_HOSTS[63]="undefined-63"
+OVRIDE_CMDS[63]="SAM_DOMAINS=''"
+
+# Future home for SAM64
+OVRIDE_HOSTS[64]="undefined-64"
+OVRIDE_CMDS[64]="SAM_DOMAINS=''"
+
+# Future home for SAM65
+OVRIDE_HOSTS[65]="undefined-65"
+OVRIDE_CMDS[65]="SAM_DOMAINS=''"
+
+# Future home for SAM66
+OVRIDE_HOSTS[66]="undefined-66"
+OVRIDE_CMDS[66]="SAM_DOMAINS=''"
+
+# Future home for SAM67
+OVRIDE_HOSTS[67]="undefined-67"
+OVRIDE_CMDS[67]="SAM_DOMAINS=''"
+
+# Future home for SAM68
+OVRIDE_HOSTS[68]="undefined-68"
+OVRIDE_CMDS[68]="SAM_DOMAINS=''"
+
+# Future home for SAM69
+OVRIDE_HOSTS[69]="undefined-69"
+OVRIDE_CMDS[69]="SAM_DOMAINS=''"
+
+# Future home for SAM70
+OVRIDE_HOSTS[70]="undefined-70"
+OVRIDE_CMDS[70]="SAM_DOMAINS=''"
+
+# Future home for SAM71
+OVRIDE_HOSTS[71]="undefined-71"
+OVRIDE_CMDS[71]="SAM_DOMAINS=''"
+
+# Future home for SAM72
+OVRIDE_HOSTS[72]="undefined-72"
+OVRIDE_CMDS[72]="SAM_DOMAINS=''"
+
+# Future home for SAM73
+OVRIDE_HOSTS[73]="undefined-73"
+OVRIDE_CMDS[73]="SAM_DOMAINS=''"
+
+# Future home for SAM74
+OVRIDE_HOSTS[74]="undefined-74"
+OVRIDE_CMDS[74]="SAM_DOMAINS=''"
+
+# Future home for SAM75
+OVRIDE_HOSTS[75]="undefined-75"
+OVRIDE_CMDS[75]="SAM_DOMAINS=''"
+
+# Future home for SAM76
+OVRIDE_HOSTS[76]="undefined-76"
+OVRIDE_CMDS[76]="SAM_DOMAINS=''"
+
+# Future home for SAM77
+OVRIDE_HOSTS[77]="undefined-77"
+OVRIDE_CMDS[77]="SAM_DOMAINS=''"
+
+# Future home for SAM78
+OVRIDE_HOSTS[78]="undefined-78"
+OVRIDE_CMDS[78]="SAM_DOMAINS=''"
+
+# Future home for SAM79
+OVRIDE_HOSTS[79]="undefined-79"
+OVRIDE_CMDS[79]="SAM_DOMAINS=''"
+
+# Future home for SAM80
+OVRIDE_HOSTS[80]="undefined-80"
+OVRIDE_CMDS[80]="SAM_DOMAINS=''"
+
+# Future home for SAM81
+OVRIDE_HOSTS[81]="undefined-81"
+OVRIDE_CMDS[81]="SAM_DOMAINS=''"
+
+# Future home for SAM82
+OVRIDE_HOSTS[82]="undefined-82"
+OVRIDE_CMDS[82]="SAM_DOMAINS=''"
+
+# Future home for SAM83
+OVRIDE_HOSTS[83]="undefined-83"
+OVRIDE_CMDS[83]="SAM_DOMAINS=''"
+
+# Future home for SAM84
+OVRIDE_HOSTS[84]="undefined-84"
+OVRIDE_CMDS[84]="SAM_DOMAINS=''"
+
+# Future home for SAM85
+OVRIDE_HOSTS[85]="undefined-85"
+OVRIDE_CMDS[85]="SAM_DOMAINS=''"
+
+# Future home for SAM86
+OVRIDE_HOSTS[86]="undefined-86"
+OVRIDE_CMDS[86]="SAM_DOMAINS=''"
+
+# Future home for SAM87
+OVRIDE_HOSTS[87]="undefined-87"
+OVRIDE_CMDS[87]="SAM_DOMAINS=''"
+
+# Future home for SAM88
+OVRIDE_HOSTS[88]="undefined-88"
+OVRIDE_CMDS[88]="SAM_DOMAINS=''"
+
+# Future home for SAM89
+OVRIDE_HOSTS[89]="undefined-89"
+OVRIDE_CMDS[89]="SAM_DOMAINS=''"
+
+# Future home for SAM90
+OVRIDE_HOSTS[90]="undefined-90"
+OVRIDE_CMDS[90]="SAM_DOMAINS=''"
+
+# Future home for SAM91
+OVRIDE_HOSTS[91]="undefined-91"
+OVRIDE_CMDS[91]="SAM_DOMAINS=''"
+
+# Future home for SAM92
+OVRIDE_HOSTS[92]="undefined-92"
+OVRIDE_CMDS[92]="SAM_DOMAINS=''"
+
+# Future home for SAM93
+OVRIDE_HOSTS[93]="undefined-93"
+OVRIDE_CMDS[93]="SAM_DOMAINS=''"
+
+# Future home for SAM94
+OVRIDE_HOSTS[94]="undefined-94"
+OVRIDE_CMDS[94]="SAM_DOMAINS=''"
+
+# Future home for SAM95
+OVRIDE_HOSTS[95]="undefined-95"
+OVRIDE_CMDS[95]="SAM_DOMAINS=''"
+
+# Future home for SAM96
+OVRIDE_HOSTS[96]="undefined-96"
+OVRIDE_CMDS[96]="SAM_DOMAINS=''"
+
+# Future home for SAM97
+OVRIDE_HOSTS[97]="undefined-97"
+OVRIDE_CMDS[97]="SAM_DOMAINS=''"
+
+# Future home for SAM98
+OVRIDE_HOSTS[98]="undefined-98"
+OVRIDE_CMDS[98]="SAM_DOMAINS=''"
+
+# Future home for SAM99
+OVRIDE_HOSTS[99]="undefined-99"
+OVRIDE_CMDS[99]="SAM_DOMAINS=''"
+
+# Future home for SAM100
+OVRIDE_HOSTS[100]="undefined-100"
+OVRIDE_CMDS[100]="SAM_DOMAINS=''"
+
+# Future home for SAM101
+OVRIDE_HOSTS[101]="pdcd01-sam1"
+OVRIDE_CMDS[101]="SAM_DOMAINS='pdcd01-ic3:pdcd01-ic3-am1.rps ndcd01-icb3:ndcd01-icb3-am1.rps 9/2 3600, pdcd01-ic3:pdcd01-ic3-am2.rps ndcd01-icb3:ndcd01-icb3-am2.rps 9/2 3600, pdcd01-ic3:pdcd01-ic3-am3.rps ndcd01-icb3:ndcd01-icb3-am3.rps 9/2 3600, pdcd01-ic3:pdcd01-ic3-am4.rps ndcd01-icb3:ndcd01-icb3-am4.rps 9/2 3600'"
+
+# Future home for SAM102
+OVRIDE_HOSTS[102]="pdcd02-sam1"
+OVRIDE_CMDS[102]="SAM_DOMAINS='pdcd02-ic2:pdcd02-ic2-am1.rps ndcd02-icb2:ndcd02-icb2-am1.rps 9/2 3600, pdcd02-ic2:pdcd02-ic2-am2.rps ndcd02-icb2:ndcd02-icb2-am2.rps 9/2 3600, pdcd02-ic2:pdcd02-ic2-am3.rps ndcd02-icb2:ndcd02-icb2-am3.rps 9/2 3600, pdcd02-ic2:pdcd02-ic2-am4.rps ndcd02-icb2:ndcd02-icb2-am4.rps 9/2 3600'"
+
+# SAM103
+OVRIDE_HOSTS[103]="pdcd03-sam1"
+OVRIDE_CMDS[103]="SAM_DOMAINS='pdcd03-ic3:pdcd03-ic3-am1.rps ndcd03-icb3:ndcd03-icb3-am1.rps 9/2 3600, pdcd03-ic3:pdcd03-ic3-am2.rps ndcd03-icb3:ndcd03-icb3-am2.rps 9/2 3600, pdcd03-ic3:pdcd03-ic3-am3.rps ndcd03-icb3:ndcd03-icb3-am3.rps 9/2 3600, pdcd03-ic3:pdcd03-ic3-am4.rps ndcd03-icb3:ndcd03-icb3-am4.rps 9/2 3600'"
+
+# SAM104
+OVRIDE_HOSTS[104]="pdcd04-sam1"
+OVRIDE_CMDS[104]="SAM_DOMAINS='pdcd04-ic3:pdcd04-ic3-am1.rps ndcd04-icb3:ndcd04-icb3-am1.rps 9/2 3600, pdcd04-ic3:pdcd04-ic3-am2.rps ndcd04-icb3:ndcd04-icb3-am2.rps 9/2 3600, pdcd04-ic3:pdcd04-ic3-am3.rps ndcd04-icb3:ndcd04-icb3-am3.rps 9/2 3600, pdcd04-ic3:pdcd04-ic3-am4.rps ndcd04-icb3:ndcd04-icb3-am4.rps 9/2 3600'"
+
+# Future home for SAM105
+OVRIDE_HOSTS[105]="undefined-105"
+OVRIDE_CMDS[105]="SAM_DOMAINS=''"
+
+# Future home for SAM106
+OVRIDE_HOSTS[106]="pdcd06-sam1"
+OVRIDE_CMDS[106]="SAM_DOMAINS='pdcd06-ic1:pdcd06-ic1-am1.rps ndcd06-icb1:ndcd06-icb1-am1.rps 11/2 3600, pdcd06-ic1:pdcd06-ic1-am2.rps ndcd06-icb1:ndcd06-icb1-am2.rps 11/2 3600, pdcd06-ic3:pdcd06-ic3-am1.rps ndcd06-icb3:ndcd06-icb3-am1.rps 11/2 3600, pdcd06-ic3:pdcd06-ic3-am2.rps ndcd06-icb3:ndcd06-icb3-am2.rps 11/2 3600'"
+
+# Future home for SAM107
+OVRIDE_HOSTS[107]="pdcd07-sam1"
+OVRIDE_CMDS[107]="SAM_DOMAINS='pdcd07-ic1:pdcd07-ic1-am1.rps ndcd07-icb1:ndcd07-icb1-am1.rps 9/2 3600, pdcd07-ic1:pdcd07-ic1-am2.rps ndcd07-icb1:ndcd07-icb1-am2.rps 9/2 3600, pdcd07-ic2:pdcd07-ic2-am1.rps ndcd07-icb2:ndcd07-icb2-am1.rps 9/2 3600, pdcd07-ic2:pdcd07-ic2-am2.rps ndcd07-icb2:ndcd07-icb2-am2.rps 9/2 3600, pdcd07-ic2:pdcd07-ic2-am3.rps ndcd07-icb2:ndcd07-icb2-am3.rps 9/2 3600'"
+
+# Future home for SAM108
+OVRIDE_HOSTS[108]="undefined-108"
+OVRIDE_CMDS[108]="SAM_DOMAINS=''"
+
+# Future home for SAM109
+OVRIDE_HOSTS[109]="undefined-109"
+OVRIDE_CMDS[109]="SAM_DOMAINS=''"
+
+# Future home for SAM110
+OVRIDE_HOSTS[110]="undefined-110"
+OVRIDE_CMDS[110]="SAM_DOMAINS=''"
+
+OVRIDE_HOSTS[111]="pdcd11-sam1"
+OVRIDE_CMDS[111]="SAM_DOMAINS='pdcd11-ic1:pdcd11-ic1-am1.rps ndcd11-icb1:ndcd11-icb1-am1.rps 11/2 3600, pdcd11-ic1:pdcd11-ic1-am2.rps ndcd11-icb1:ndcd11-icb1-am2.rps 11/2 3600, pdcd11-ic1:pdcd11-ic1-am3.rps ndcd11-icb1:ndcd11-icb1-am3.rps 11/2 3600, pdcd11-ic1:pdcd11-ic1-am4.rps ndcd11-icb1:ndcd11-icb1-am4.rps 11/2 3600'"
+
+# Future home for SAM112
+OVRIDE_HOSTS[112]="pdcd12-sam1"
+OVRIDE_CMDS[112]="SAM_DOMAINS='pdcd12-ic1:pdcd12-ic1-am1.rps ndcd12-icb1:ndcd12-icb1-am1.rps 9/2 3600, pdcd12-ic1:pdcd12-ic1-am2.rps ndcd12-icb1:ndcd12-icb1-am2.rps 9/2 3600, pdcd12-ic1:pdcd12-ic1-am3.rps ndcd12-icb1:ndcd12-icb1-am3.rps 9/2 3600, pdcd12-ic1:pdcd12-ic1-am4.rps ndcd12-icb1:ndcd12-icb1-am4.rps 9/2 3600'"
+
+# Future home for SAM113
+OVRIDE_HOSTS[113]="undefined-113"
+OVRIDE_CMDS[113]="SAM_DOMAINS=''"
+
+# Future home for SAM114
+OVRIDE_HOSTS[114]="undefined-114"
+OVRIDE_CMDS[114]="SAM_DOMAINS=''"
+
+# Future home for SAM115
+OVRIDE_HOSTS[115]="undefined-115"
+OVRIDE_CMDS[115]="SAM_DOMAINS=''"
+
+# Future home for SAM116
+OVRIDE_HOSTS[116]="undefined-116"
+OVRIDE_CMDS[116]="SAM_DOMAINS=''"
+
+# Future home for SAM117
+OVRIDE_HOSTS[117]="undefined-117"
+OVRIDE_CMDS[117]="SAM_DOMAINS=''"
+
+# Future home for SAM118
+OVRIDE_HOSTS[118]="undefined-118"
+OVRIDE_CMDS[118]="SAM_DOMAINS=''"
+
+# Future home for SAM119
+OVRIDE_HOSTS[119]="undefined-119"
+OVRIDE_CMDS[119]="SAM_DOMAINS=''"
+
+# Future home for SAM120
+OVRIDE_HOSTS[120]="undefined-120"
+OVRIDE_CMDS[120]="SAM_DOMAINS=''"
+
+# Future home for SAM121
+OVRIDE_HOSTS[121]="undefined-121"
+OVRIDE_CMDS[121]="SAM_DOMAINS=''"
+
+# Future home for SAM122
+OVRIDE_HOSTS[122]="undefined-122"
+OVRIDE_CMDS[122]="SAM_DOMAINS=''"
+
+# Future home for SAM123
+OVRIDE_HOSTS[123]="undefined-123"
+OVRIDE_CMDS[123]="SAM_DOMAINS=''"
+
+# Future home for SAM124
+OVRIDE_HOSTS[124]="undefined-124"
+OVRIDE_CMDS[124]="SAM_DOMAINS=''"
+
+# Future home for SAM125
+OVRIDE_HOSTS[125]="undefined-125"
+OVRIDE_CMDS[125]="SAM_DOMAINS=''"
+
+# Future home for SAM126
+OVRIDE_HOSTS[126]="undefined-126"
+OVRIDE_CMDS[126]="SAM_DOMAINS=''"
+
+# SAM127
+OVRIDE_HOSTS[127]="pdcc01-sam27"
+OVRIDE_CMDS[127]="SAM_DOMAINS='pdcd27-ic1:pdcd27-ic1-ampm1.rps ndcd27-icb1:ndcd27-icb1-ampm1.rps 9/2 3600, pdcd27-ic1:pdcd27-ic1-ampm2.rps ndcd27-icb1:ndcd27-icb1-ampm2.rps 9/2 3600, pdcd27-ic2:pdcd27-ic2-ampm1.rps ndcd27-icb2:ndcd27-icb2-ampm1.rps 9/2 3600, pdcd27-ic2:pdcd27-ic2-ampm2.rps ndcd27-icb2:ndcd27-icb2-ampm2.rps 9/2 3600'"
+
+# Future home for SAM128
+OVRIDE_HOSTS[128]="undefined-128"
+OVRIDE_CMDS[128]="SAM_DOMAINS=''"
+
+# Future home for SAM129
+OVRIDE_HOSTS[129]="undefined-129"
+OVRIDE_CMDS[129]="SAM_DOMAINS=''"
+
+# Future home for SAM130
+OVRIDE_HOSTS[130]="undefined-130"
+OVRIDE_CMDS[130]="SAM_DOMAINS=''"
+
+# Future home for SAM131
+OVRIDE_HOSTS[131]="undefined-131"
+OVRIDE_CMDS[131]="SAM_DOMAINS=''"
+
+# Future home for SAM132
+OVRIDE_HOSTS[132]="undefined-132"
+OVRIDE_CMDS[132]="SAM_DOMAINS=''"
+
+# Future home for SAM133
+OVRIDE_HOSTS[133]="undefined-133"
+OVRIDE_CMDS[133]="SAM_DOMAINS=''"
+
+# Future home for SAM134
+OVRIDE_HOSTS[134]="pdcd34-sam1"
+OVRIDE_CMDS[134]="SAM_DOMAINS='pdcd34-ic1:pdcd34-ic1-ampm1.rps ndcd34-icb1:ndcd34-icb1-ampm1.rps 9/2 3600, pdcd34-ic1:pdcd34-ic1-ampm2.rps ndcd34-icb1:ndcd34-icb1-ampm2.rps 9/2 3600, pdcd34-ic1:pdcd34-ic1-ampm3.rps ndcd34-icb1:ndcd34-icb1-ampm3.rps 9/2 3600, pdcd34-ic1:pdcd34-ic1-ampm4.rps ndcd34-icb1:ndcd34-icb1-ampm4.rps 9/2 3600'"
+
+OVRIDE_HOSTS[135]="pdcd35-sam1"
+OVRIDE_CMDS[135]="SAM_DOMAINS='pdcd35-ic4:pdcd35-ic4-ampm1.rps ndcd35-icb4:ndcd35-icb4-ampm1.rps 9/2 3600, pdcd35-ic4:pdcd35-ic4-ampm2.rps ndcd35-icb4:ndcd35-icb4-ampm2.rps 9/2 3600, pdcd35-ic4:pdcd35-ic4-ampm3.rps ndcd35-icb4:ndcd35-icb4-ampm3.rps 9/2 3600, pdcd35-ic4:pdcd35-ic4-ampm4.rps ndcd35-icb4:ndcd35-icb4-ampm4.rps 9/2 3600, pdcd35-ic5:pdcd35-ic5-ampm1.rps ndcd35-icb5:ndcd35-icb5-ampm1.rps 9/2 3600, pdcd35-ic5:pdcd35-ic5-ampm2.rps ndcd35-icb5:ndcd35-icb5-ampm2.rps 9/2 3600, pdcd35-ic5:pdcd35-ic5-ampm3.rps ndcd35-icb5:ndcd35-icb5-ampm3.rps 9/2 3600, pdcd35-ic5:pdcd35-ic5-ampm4.rps ndcd35-icb5:ndcd35-icb5-ampm4.rps 9/2 3600, pdcd35-ic6:pdcd35-ic6-ampm1.rps ndcd35-icb6:ndcd35-icb6-ampm1.rps 9/2 3600, pdcd35-ic6:pdcd35-ic6-ampm2.rps ndcd35-icb6:ndcd35-icb6-ampm2.rps 9/2 3600, pdcd35-ic6:pdcd35-ic6-ampm3.rps ndcd35-icb6:ndcd35-icb6-ampm3.rps 9/2 3600, pdcd35-ic6:pdcd35-ic6-ampm4.rps ndcd35-icb6:ndcd35-icb6-ampm4.rps 9/2 3600'"
+
+# Future home for SAM136
+OVRIDE_HOSTS[136]="undefined-136"
+OVRIDE_CMDS[136]="SAM_DOMAINS=''"
+
+# Future home for SAM137
+OVRIDE_HOSTS[137]="undefined-137"
+OVRIDE_CMDS[137]="SAM_DOMAINS=''"
+
+# Future home for SAM138
+OVRIDE_HOSTS[138]="undefined-138"
+OVRIDE_CMDS[138]="SAM_DOMAINS=''"
+
+# SAM139 is not geographically diverse, so no copy_rps
+OVRIDE_HOSTS[139]="undefined-139"
+OVRIDE_CMDS[139]="SAM_DOMAINS=''"
+
+# Future home for SAM140
+OVRIDE_HOSTS[140]="undefined-140"
+OVRIDE_CMDS[140]="SAM_DOMAINS=''"
+
+# Future home for SAM141
+OVRIDE_HOSTS[141]="undefined-141"
+OVRIDE_CMDS[141]="SAM_DOMAINS=''"
+
+# Future home for SAM142
+OVRIDE_HOSTS[142]="undefined-142"
+OVRIDE_CMDS[142]="SAM_DOMAINS=''"
+
+# Future home for SAM143
+OVRIDE_HOSTS[143]="undefined-143"
+OVRIDE_CMDS[143]="SAM_DOMAINS=''"
+
+# Future home for SAM144
+OVRIDE_HOSTS[144]="undefined-144"
+OVRIDE_CMDS[144]="SAM_DOMAINS=''"
+
+# Future home for SAM145
+OVRIDE_HOSTS[145]="undefined-145"
+OVRIDE_CMDS[145]="SAM_DOMAINS=''"
+
+# Future home for SAM146
+OVRIDE_HOSTS[146]="undefined-146"
+OVRIDE_CMDS[146]="SAM_DOMAINS=''"
+
+# Future home for SAM147
+OVRIDE_HOSTS[147]="undefined-147"
+OVRIDE_CMDS[147]="SAM_DOMAINS=''"
+
+# Future home for SAM148
+OVRIDE_HOSTS[148]="undefined-148"
+OVRIDE_CMDS[148]="SAM_DOMAINS=''"
+
+# Future home for SAM149
+OVRIDE_HOSTS[149]="undefined-149"
+OVRIDE_CMDS[149]="SAM_DOMAINS=''"
+
+# Future home for SAM150
+OVRIDE_HOSTS[150]="undefined-150"
+OVRIDE_CMDS[150]="SAM_DOMAINS=''"
+
+# Prod-Like Dev Environment
+OVRIDE_HOSTS[151]="ndctc1-samb1"
+OVRIDE_CMDS[151]="SAM_DOMAINS='ndctc4-samb1:ndctc4-samb1-ampm1.rps ndctc2-samb1:ndctc2-samb1-ampm1.rps 9/2 3600, ndctc4-samb1:ndctc4-samb1-ampm2.rps ndctc2-samb1:ndctc2-samb1-ampm2.rps 9/2 3600'"
+
+################################################################
+
+# Obtain the name of the current server
+
+
+LOCAL_HOST=`/usr/bin/hostname | /usr/bin/awk -F. '{ print $1 }'`
+
+# Location of smarts home for AM/PM
+
+AMPM_HOME=/opt/incharge/IP/smarts
+
+### Location of smarts home for OI/SAM
+
+SAMOI_HOME=/opt/incharge/SAM/smarts
+
+### Location of smarts home for VOIP
+
+VOIP_HOME=/opt/incharge/VoIP/smarts
+
+### Location of smarts home for MPLS
+
+MPLS_HOME=/opt/incharge/MPLS/smarts
+
+### Location of smarts home for NPM
+
+NPM_HOME=/opt/incharge/NPM/smarts
+
+### Location of smarts home for ACM
+
+ACM_HOME=/opt/incharge/ACM/smarts
+
+### Location of InfoVista
+
+IV_HOME=/opt/InfoVista/Ivserver
+
+IVD_HOME=/opt/InfoVista/VistaDiscovery
+
+PO_HOME=/opt/InfoVista/Portal
+
+CP_HOME=/opt/InfoVista/Cockpit
+
+VM_HOME=/opt/InfoVista/Vistamart
+
+### Location of smarts home for ESM
+
+ESM_HOME=/opt/incharge/ESM/smarts
+
+
+
+################################################################
+
+if [ -z "$LOCAL_HOST" ]; then
+   print "ERRCODE:16 - Failed to get hostname in var LOCAL_HOST"
+   exit 16
+fi
+
+let D_CNT=${#DOMAINS[*]}
+
+INDOMAINS=""
+CURRDOM=""
+let idx=0
+while (( idx <= D_CNT ))
+do
+   let domidx=${DOMAINS[idx]}
+   TMP=`echo ${DOMAIN[domidx]} | $GREP "${LOCAL_HOST}:"` 
+   if [ "$TMP" != "" ]; then
+      CURRDOM=${DOMAINS[idx]}
+      if [ "$INDOMAINS" =  "" ]; then
+         INDOMAINS=${CURRDOM}
+      else
+         INDOMAINS="${INDOMAINS} ${CURRDOM}"
+      fi
+   fi
+   let idx=idx+1
+done 
+
+if [ -z "$INDOMAINS" ]; then
+   print "ERRCODE:16 - Failed to locate $LOCAL_HOST definition in SMARTS_Config"
+   exit 16
+fi
+
+######## Parse out all the servers for domain in which 
+######## server $LOCAL_HOST is in
+
+SM_MULTI_DOMAIN=""
+
+MULTI[1]=SAM_MULTI_DOMAIN
+MULTI[2]=AM_MULTI_DOMAIN
+MULTI[3]=OI_MULTI_DOMAIN
+MULTI[4]=PM_MULTI_DOMAIN
+MULTI[5]=SIS_MULTI_DOMAIN
+MULTI[6]=CONCORD_MULTI_DOMAIN
+MULTI[7]=SNMCPE_MULTI_DOMAIN
+MULTI[8]=DM_MULTI_DOMAIN
+MULTI[9]=VOIP_MULTI_DOMAIN
+MULTI[10]=IV_MULTI_DOMAIN
+MULTI[11]=IVD_MULTI_DOMAIN
+
+ALL[1]='ALL_SAMS'
+ALL[2]='ALL_AMS'
+ALL[3]='ALL_OIS'
+ALL[4]='ALL_PMS'
+ALL[5]='ALL_SISS'
+ALL[6]='ALL_CONCORDS'
+ALL[7]='ALL_SNMCPES'
+ALL[8]='ALL_DMS'
+ALL[9]='ALL_VOIPS'
+ALL[10]='ALL_IVS'
+ALL[11]='ALL_IVDS'
+
+ALL_P[1]='ALL_SAM_PROCESSES'
+ALL_P[2]='ALL_AM_PROCESSES'
+ALL_P[3]='ALL_OI_PROCESSES'
+ALL_P[4]='ALL_PM_PROCESSES'
+ALL_P[5]='ALL_SIS_PROCESSES'
+ALL_P[6]='ALL_CONCORD_PROCESSES'
+ALL_P[7]='ALL_SNMCPE_PROCESSES'
+ALL_P[8]='ALL_DM_PROCESSES'
+ALL_P[9]='ALL_VOIP_PROCESSES'
+ALL_P[10]='ALL_IV_PROCESSES'
+ALL_P[11]='ALL_IVD_PROCESSES'
+
+TYPE[1]=SAM
+TYPE[2]=AM
+TYPE[3]=OI
+TYPE[4]=PM
+TYPE[5]=SIS
+TYPE[6]=CONCORD
+TYPE[7]=SNMCPE
+TYPE[8]=DM
+TYPE[9]=VOIP
+TYPE[10]=IV
+TYPE[11]=IVD
+
+set $INDOMAINS
+
+INDOMS_CNT=$#
+
+while test $# -ge 1
+do
+   
+   SAVE_OARGS=$*
+   domain=$1
+
+   # SAMs
+   TYPES[1]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $1 }'`
+   # AMs
+   TYPES[2]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $2 }' | $SED 's/^ *//g'`
+   # OIs
+   TYPES[3]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $3 }' | $SED 's/^ *//g'`
+   # PMs
+   TYPES[4]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $4 }' | $SED 's/^ *//g'`
+   # SISs
+   TYPES[5]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $5 }' | $SED 's/^ *//g'`
+   # CONCORDs
+   TYPES[6]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $6 }' | $SED 's/^ *//g'`
+   # SNMCPEs
+   TYPES[7]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $7 }' | $SED 's/^ *//g'`
+   # DMs
+   TYPES[8]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $8 }' | $SED 's/^ *//g'`
+   # VOIPs
+   TYPES[9]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $9 }' | $SED 's/^ *//g'`
+   # IVs
+   TYPES[10]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $10 }' | $SED 's/^ *//g'`
+   # IVDs
+   TYPES[11]=`echo ${DOMAIN[domain]} | $AWK -F, '{ print $11 }' | $SED 's/^ *//g'`
+
+   let TYPES_CNT=${#TYPES[*]}
+
+   PRIMARY_FLAG=0
+   let PRIMARY=1
+   let itr=1
+   while (( $itr <= $TYPES_CNT ))
+   do
+      if [ -n "${TYPES[itr]}" ]; then
+         set ${TYPES[itr]}
+         SAVE_IARGS=
+         let idx=0
+         eval $( print DOM${domain}_${TYPE[itr]}${idx}_PROCESSES)=
+         eval $( print ${MULTI[itr]})=
+         eval $( print ${ALL_P[itr]})=
+         eval $( print ${ALL[itr]})=
+         while test $# -ge 1
+         do
+           let PRIMARY=PRIMARY%2
+           SERVER=$1
+           PROCESSES=`echo $1 | $GREP ':'`
+           if [ -n "$PROCESSES" ]; then
+              PROCESSES=`echo $1 | $SED 's/\:/ /g'`
+              SAVE_IARGS=$*
+              set $PROCESSES
+              SERVER=$1
+              shift
+              #PROCESS=$1
+              #PROCESS0=`print $1 | $SED 's/@[0-9]*//g'`
+              #PROCESSES=`echo $* | $SED 's/^ //g;'`
+              if (( $# == 0 )); then
+                 # Just a server def without process info, so stuff into server
+                 # vars ALL_AMS/ALL_SAMS/ ...
+                 TMP1=`eval print '$'$( print ${ALL[itr]})`
+                 if [ -n "$TMP1" ]; then
+                     SAVE_PARGS=$*
+                     set $TMP1
+                     FOUND=0
+                     while test $# -gt 0
+                     do
+                        PROC=`print $1 | $SED 's/ //g'`
+                        if [ "$PROC" = "$SERVER" ]; then
+                           FOUND=1
+                        fi
+                        # Don't break even if FOUND here since we want to return
+                        # the number of set args to 0, so shift them on off
+                        shift
+                     done
+ 
+                     if (( FOUND == 0 )); then
+                        eval "${ALL[itr]}=\"`eval print '$'$( print ${ALL[itr]} )` `print ${SERVER}`\""
+                     fi
+                 else
+                     eval "${ALL[itr]}=\"`print ${SERVER}`\""
+                 fi
+              fi
+              while test $# -gt 0
+              do
+                PROCESS=$1
+                PROCESS0=`print $1 | $SED 's/@[0-9]*//g'`
+                if [ "$SERVER" = "$LOCAL_HOST" ]; then
+                   PRIMARY_FLAG=$PRIMARY
+                   #TMP0=`eval print "'$'$( print ${MULTI[itr]})"`
+                   TMP0=`eval print '$'$( print ${MULTI[itr]})`
+                   if [ -n "$TMP0" ]; then
+                      SAVE_PARGS=$*
+                      set $TMP0
+                      FOUND=0
+                      while test $# -gt 0
+                      do
+                       PROC=`print $1 | $SED 's/ //g'`
+                       if [ "$PROC" = "$PROCESS0" ]; then
+                            FOUND=1
+                            break
+                         fi
+                         shift
+                      done
+ 
+                      set $SAVE_PARGS
+
+                      if (( FOUND == 0 )); then
+                         eval "${MULTI[itr]}=\"`print ${TMP0}` `print ${PROCESS0}`\""
+                      fi
+                   else
+                      eval "${MULTI[itr]}=\"`print ${PROCESS0}`\""
+                   fi
+                fi
+              #set $SAVE_IARGS
+                TMP1=`eval print '$'$( print DOM${domain}_${TYPE[itr]}${idx}_PROCESSES)`
+                SAVE_PARGS=$*
+                if [ -n "$TMP1" ]; then
+                   set $TMP1
+                   FOUND=0
+                   while test $# -gt 0
+                   do
+                       PROC=`print $1 | $SED 's/ //g'`
+                       if [ "$PROC" = "$PROCESS" ]; then
+                          FOUND=1
+                          break
+                       fi
+                       shift
+                   done
+
+                   set $SAVE_PARGS
+
+                   if (( FOUND == 0 )); then
+                      eval "export DOM${domain}_${TYPE[itr]}${idx}_PROCESSES=\"`print ${TMP1}` `print ${PROCESS}`\""
+                   fi
+                else
+                      eval "export DOM${domain}_${TYPE[itr]}${idx}_PROCESSES=\"`print ${PROCESS}`\""
+                fi
+
+                TMP1=`eval print '$'$( print ${ALL_P[itr]})`
+                if [ -n "$TMP1" ]; then
+                    SAVE_PARGS=$*
+                    set $TMP1
+                    FOUND=0
+                    while test $# -gt 0
+                    do
+                       PROC=`print $1 | $SED 's/ //g'`
+                       if [ "$PROC" = "$PROCESS" ]; then
+                          FOUND=1
+                          break
+                       fi
+                       shift
+                    done
+
+                    set $SAVE_PARGS
+
+                    if (( FOUND == 0 )); then
+                       eval "${ALL_P[itr]}=\"`eval print '$'$( print ${ALL_P[itr]} )` `print ${PROCESS}`\""
+                    fi
+                else
+                      eval "${ALL_P[itr]}=\"`print ${PROCESS}`\""
+                fi
+
+                eval "export DOM${domain}_${TYPE[itr]}${idx}=\"${SERVER}\""
+
+                TMP1=`eval print '$'$( print ${ALL[itr]})`
+                if [ -n "$TMP1" ]; then
+                    SAVE_PARGS=$*
+                    set $TMP1
+                    FOUND=0
+                    while test $# -gt 0
+                    do
+                       PROC=`print $1 | $SED 's/ //g'`
+                       if [ "$PROC" = "$SERVER" ]; then
+                          FOUND=1
+                          break
+                       fi
+                       shift
+                    done
+
+                    set $SAVE_PARGS
+
+                    if (( FOUND == 0 )); then
+                       eval "${ALL[itr]}=\"`eval print '$'$( print ${ALL[itr]} )` `print ${SERVER}`\""
+                    fi
+                else
+                    eval "${ALL[itr]}=\"`print ${SERVER}`\""
+                fi
+                shift
+              done
+              set $SAVE_IARGS
+           fi
+           let idx=idx+1
+           shift
+           let PRIMARY=PRIMARY+1
+         done
+      fi
+      let itr=itr+1
+      let PRIMARY=1
+   done
+
+   set $SAVE_OARGS
+   shift
+
+done
+
+######################## Done parsing domain servers ###################
+
+OI_DNS_SERVERS=${OI_DNS[CURRDOM]}
+OIB1_DNS_SERVERS=${OIB1_DNS[CURRDOM]}
+ALL_DNS_SERVERS="${OI_DNS[CURRDOM]} ${OIB1_DNS[CURRDOM]}"
+
+################################################################
+
+# The am1 hosts and all corresponding "redundant" am's (usually 
+# just am2) associated with it.  Spaces separate related am's, 
+# and commas separate each group of related am's.  Each group must 
+# end with a time to run, with the amount of time (window) the group 
+# is allowed to run expressed in hours.  Separate the time to run
+# from the window by a slash, ex. 12/4, which means
+# run at 12 o' clock and can run for 4 hours thereafter.  The time
+# specification should be in 24 hour format (0-23).   The last arg/param
+# is the number of seconds before expiring dmctl pings.
+# This value reflects the total time in seconds to complete dmctl pings
+# for ALL am's in a domain (defined by a single line).
+# Always use single quotes to enclose this variable's values.
+#SAM_DOMAINS='cayd01-am1 cayd01-am2 12/4 2700,
+#            cayd03-am1 cayd03-am2 12/4 2700,
+#            cayd04-am1 cayd04-am2 12/4 2700,
+#            cayd06-am1 cayd06-am2 12/4 2700,
+#            crytd4-am1 crytd4-am2 23/4 2700,
+#            crytd7-am1 crytd7-am2 12/4 2700'
+#
+
+#SAM_DOMAINS='crytd4-am1:crytd4-am1-am1.rps crytd4-am2:crytd4-am2-am1.rps 9/2 3600'
+SAM_DOMAINS=''
+
+oss_mailList=${EMAIL[CURRDOM]}
+
+oss_pageList=${PAGE[CURRDOM]}
+
+# Set Concord name  variable(s).  If localhost a member of 
+# multiple domains ( like a SAM server), these vars are meaningless
+
+CONCORD1=`print ${ALL_CONCORDS} | $AWK '{ print $1 }'`
+
+# Set AM1 and AM2 legacy variables.  The method for setting them requires
+# that the servers are always paired together sequentially in the DOMAIN 
+# array entry.
+# dlh - when localhost is the secondary server AM2 wrongly gets set to next
+#       primary server in list. Using PREV to store and set correctly.
+
+AM1=""
+AM2=""
+PREV=""
+
+if [ -n "$ALL_AMS" ]; then
+   set $ALL_AMS
+   while test $# -gt 0
+   do
+      if [ "$1" = "$LOCAL_HOST" ]; then
+         AM1=$1
+         if [ "$PRIMARY_FLAG" = "1" ]; then
+            AM2=$2
+         else
+            AM2=$PREV
+         fi
+         break
+      else
+         PREV=$1
+         shift
+      fi
+   done
+   # if LOCAL_HOST was not found above in ALL_AMS, then we are dealing with
+   # a stand-alone VOIP.
+
+   if [ -n "$ALL_VOIPS" ]; then
+       set $ALL_VOIPS
+       while test $# -gt 0
+       do
+          if [ "$1" = "$LOCAL_HOST" ]; then
+             AM1=$1
+             AM2=$2
+             break
+          else
+             shift
+          fi
+       done
+   fi
+fi
+
+# Name provisioning locations
+DNS_HOME=/home/dns
+CUST_HOME=/home/customers
+
+# Location of domain files
+NAMED_DIR=/var/named
+
+#Enable or disable ALL SYSTEM NOTIFICATION PAGING FOR THIS BOX
+# Currently, there are three paging scenarios.
+SMARTSpage="ON"		# ON or OFF
+
+# Set the list of users who'll get daily status mailings for 
+# SMARTS boxes...
+mailList=${EMAIL[CURRDOM]}
+tme_mailList=${EMAIL[CURRDOM]}
+
+# Directories, files, and pattern-matched files for "copy_changes" 
+# to archive.  Always use double quites to encase var assignment
+ARCHIVE_DIRS="${DNS_HOME}
+             ${CUST_HOME}
+             ${NAMED_DIR}
+             ${AMPM_HOME}/local/conf/discovery/partition.conf
+             ${AMPM_HOME}/local.am[0-9]\*/conf/discovery/partition.conf
+             ${AMPM_HOME}/local.ampm[0-9]\*/conf/discovery/partition.conf
+             ${AMPM_HOME}/local/conf/\*.rps
+             ${AMPM_HOME}/local/repos/icf/\*.rps
+             ${MPLS_HOME}/local/repos/icf/\*.rps
+             ${NPM_HOME}/local/repos/icf/\*.rps
+             ${ACM_HOME}/local/repos/icf/\*.rps
+             ${ESM_HOME}/local/repos/icf/\*.rps
+             ${VOIP_HOME}/local/repos/icf/\*.rps"
+
+IVD_ARCHIVE_DIRS="${IVD_HOME}/autodiscovery/config
+             ${IVD_HOME}/autodiscovery/provision
+             ${IVD_HOME}/autodiscovery/report
+             ${IVD_HOME}/repository
+             ${IVD_HOME}/workflows
+             ${CP_HOME}/mgtconsole/config"
+
+# Patterns to cause exclusion from file being unarchived by am2_backup
+# Always use single quotes to encase var assignments
+ARCHIVE_EXCL=' addr_file_by_state
+              dbr_
+              named
+              \.rps\.'
+
+# Over-ride the excluded pattern by specifying files to include  in
+# un-archiving.
+ARCHIVE_INCL=
+
+# Specify type processes that we want copy_changes/am2_backup to be able to
+# archive (tar), copy, and unarchive (untar) server .rps files for copy_rps
+# Initially, it was only AM (or IC) servers, and now we've added VOIP
+if [ -n "$ALL_VOIP_PROCESSES" ]; then
+   ARCHIVE_INCL=`print $ALL_VOIP_PROCESSES | $SED 's/@[0-9]*//g'`
+fi
+if [ -n "$ALL_AM_PROCESSES" ]; then
+   if [ -z "$ARCHIVE_INCL" ]; then
+      ARCHIVE_INCL=`print $ALL_AM_PROCESSES | $SED 's/@[0-9]*//g'`
+   else
+      ARCHIVE_INCL=`print $ARCHIVE_INCL $ALL_AM_PROCESSES | $SED 's/@[0-9]*//g'`
+   fi
+fi
+TMP=
+if [ -n "$ARCHIVE_INCL" ]; then
+   set $ARCHIVE_INCL
+   while test $# -gt 0
+   do
+      if [ -z "$TMP" ]; then
+         TMP="$1.rps.tar_\*.Z"
+      else
+         TMP="$TMP $1.rps.tar_\*.Z"
+      fi
+      shift
+   done
+fi
+
+ARCHIVE_INCL=$TMP
+
+# All domains should be multi now, so not setting SMDomain - dwilliam 04-11-2005
+SMDomain=
+SM_MULTI_DOMAIN=$AM_MULTI_DOMAIN
+
+# DNS Domain Names -- for Infrastructure and for Customer Devices
+DNSinfrDom=`print ${CDOM[CURRDOM]} | $AWK -F. '{print $2"."$3"."$4}'`
+DNScustDom=${CDOM[CURRDOM]}
+
+SMb[1]=${AM1}
+SMb[2]=${AM2}
+SM_AM1=${AM1}
+SM_AM2=${AM2}
+
+# Nameserver names
+SM_NS="${AM1} ${AM2}"
+
+# Sendmail Mail Forwarder for perlmail to work
+SMTP=
+if [ -e "/etc/mail/sendmail.cf" ]; then
+   SMTP=`$CAT /etc/mail/sendmail.cf | $GREP '^DS' | $SED -e 's/DS//' -e 's/\[//g' -e 's/\]//g'`
+   if [ -z "$SMTP" ]; then
+      # Try one more thing
+      SMTP=`$CAT /etc/mail/sendmail.cf | $GREP '^D{RELAY}' | $SED -e 's/D{RELAY}//' -e 's/\[//g' -e 's/\]//g'`
+   fi
+fi
+
+JAKARTA="/opt/ensmarts"
+
+VOIP_INCL="Unity Gateway CRA CER CallManager CallManagerExpress CallUnityExpress"
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+### Do NOT place any variable declarations below this line.  Variable
+### over-riding for a specific host would fail for any vars that are.
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+###### Now process/set/export variables specific to a particular host
+###### This should be the last thing done before variable exports.
+
+let TMP_CNT=${#OVRIDE_HOSTS[*]}
+let idx=1
+while (( idx <= TMP_CNT ))
+do
+      if [ "${OVRIDE_HOSTS[idx]}"  = "$LOCAL_HOST" ]; then
+         eval "export ${OVRIDE_CMDS[idx]}"
+      fi
+      let idx=idx+1
+done
+
+######  export all that is meaningful to external scripts
+
+export LOCAL_HOST
+export PRIMARY_FLAG
+export AMPM_HOME
+export SAMOI_HOME Node_Down_interval
+export  SMb SM_AM1 SM_AM2
+export DNSinfrDom DNScustDom
+export DNS_HOME CUST_HOME NAMED_DIR
+export mailList tme_mailList
+export SM_NS ARCHIVE_DIRS ARCHIVE_EXCL ARCHIVE_INCL
+export SMARTSpage SMARTSpageWho SMcommunities 
+export SAM_DOMAINS
+export oss_mailList
+export oss_pageList
+export CONCORD1
+export VOIP_HOME
+export MPLS_HOME
+export NPM_HOME
+export ACM_HOME
+export IVD_ARCHIVE_DIRS IVD_HOME
+export ESM_HOME
+
+# Always check (in your scripts) that INDOMAINS does not contain more
+# than one domain before using CURRDOM.  CURRDOM is meaningless (was
+# just the last domain processed) when a server is a member of 
+# multiple domains (say for example, a sam server).  You can check the
+# value of INDOMS_CNT for number of domains current server is member of
+# or process INDOMAINS yourself.
+export INDOMAINS
+export CURRDOM
+export INDOMS_CNT
+export JAKARTA
+
+# If $LOCAL_HOST is found in multiple domains, ALL_SAMS would include those
+# sams in different domains as well. (Also for ALL_AMS, ALL_OIS, ALL_PMS,
+# ALL_SAM_PROCESSES, ALL_AM_PROCESSES, ALL_OI_PROCESSES, ALL_PM_PROCESSES
+
+export ALL_SAMS
+export ALL_AMS
+export ALL_OIS
+export ALL_PMS
+export ALL_SISS
+export ALL_CONCORDS
+export ALL_SNMCPES
+export ALL_DMS
+export ALL_VOIPS
+export ALL_IVS
+export ALL_IVDS
+
+# Contains all defined process names, including server name for the
+# SAM's, AM's (or IC's), OI's, and PM's separated by spaces.  The format is
+# the same as entered in array DOMAIN at the top. Example:
+
+# ALL_AM_PROCESSES="cayd01-am1:smserver_1@9605:cayd01-am1:smserver_2:9607 
+#                   cayd05-am1:smserver_1@9605:smserver_2@9607"
+
+# NOTE!!! ::  This example was merely to show the structure.  It was not
+#             intended to be a valid implementation, i.e., at this
+#             juncture there should be no AM(s) as a member of multiple 
+#             domains.  But, this is a probability for SAMS.
+#
+
+export ALL_SAM_PROCESSES
+export ALL_AM_PROCESSES
+export ALL_OI_PROCESSES
+export ALL_PM_PROCESSES
+export ALL_SIS_PROCESSES
+export ALL_CONCORD_PROCESSES
+export ALL_SNMCPE_PROCESSES
+export ALL_DM_PROCESSES
+export ALL_VOIP_PROCESSES
+export ALL_IV_PROCESSES
+export ALL_IVD_PROCESSES
+export OI_DNS_SERVERS
+export OIB1_DNS_SERVERS
+export ALL_DNS_SERVERS
+export SM_MULTI_DOMAIN
+export SMDomain
+export SAM_MULTI_DOMAIN
+export AM_MULTI_DOMAIN
+export OI_MULTI_DOMAIN
+export PM_MULTI_DOMAIN
+export CONCORD_MULTI_DOMAIN
+export SIS_MULTI_DOMAIN
+export SNMCPE_MULTI_DOMAIN
+export DM_MULTI_DOMAIN
+export VOIP_MULTI_DOMAIN
+export IV_MULTI_DOMAIN
+export IVD_MULTI_DOMAIN
+export VOIP_INCL
+
+export SMTP
+
+export AMS PMS OIS SISS SAMS CONCORDS SNMCPES DMS
+export SM_DISABLE_FLOW_WRAPPER=1
+
+###

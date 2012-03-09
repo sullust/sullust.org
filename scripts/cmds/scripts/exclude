@@ -1,0 +1,10 @@
+admin-console.war
+tmp
+data
+work
+snmcpe.ear
+jmx-console.war
+*.gz
+management
+*.log
+snmcpe.pid

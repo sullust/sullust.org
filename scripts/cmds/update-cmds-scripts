@@ -1,0 +1,5 @@
+#!/bin/bash
+date;
+rsync -avz jainswor@pdcc01-cmds1.mso.mci.com:~/scripts /Users/accounts/scripts/cmds/
+
+echo "--------------------------------------------------------------------------------";

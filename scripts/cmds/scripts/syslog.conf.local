@@ -1,0 +1,32 @@
+# snmcpe.conf - MNSO SNMCPE Servers (for symlinking to /etc/syslog.conf.local)
+#
+# To override where the 'local[0-9]' syslog facilities are logged,
+# define `LOCALx' and then insert the appropriate syslog entry.
+#
+# $Id: snmcpe.conf,v 1.2 2008/06/12 23:33:35 ejgurney.mcilink.com Exp $
+
+# -----------------------------------------------------------------------------
+
+define(`LOCAL0')
+
+# TACACS logging
+local0.debug				/var/log/csuslog
+
+# -----------------------------------------------------------------------------
+
+define(`LOCAL5')
+define(`LOCAL7')
+define(`SYSLOG')
+
+# Cisco CME logging
+local5.info;local7.debug		/esp/snmcpe/cmerecords/logs/cme.log
+local5.info				/var/log/cme
+
+# Cisco logging
+syslog.info;local7.debug		/logs/cisco_logs/cisco.log
+
+ifdef(`LOCAL0', ,local0.notice		/var/log/csuslog)
+
+# -----------------------------------------------------------------------------
+#*.debug				/logs/cisco_logs/cisco.log
+#*.debug				/esp/snmcpe/cmerecords/logs/cme.log

@@ -1,0 +1,164 @@
+rsync: failed to open exclude file /home/esp/instance-copy-exclude: No such file or directory (2)
+rsync error: error in file IO (code 11) at exclude.c(1005) [client=2.6.9]
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd01-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd01-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd01-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd01-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd02-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd02-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd02-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd02-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd03-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd03-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd03-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd03-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd04-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd04-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd04-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd04-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd05-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd05-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd05-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd05-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd06-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd06-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd06-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd06-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd07-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd07-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd07-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd07-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd08-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd08-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd08-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd08-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd09-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd09-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd09-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd09-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd10-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd10-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd10-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd10-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd11-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd11-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd11-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd11-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd12-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd12-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd12-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd12-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd13-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd13-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd13-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd13-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd14-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd14-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd14-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd14-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd15-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd15-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd15-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd15-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd16-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd16-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd16-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd16-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd17-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd17-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd17-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd17-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd18-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd18-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd18-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd18-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd20-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd20-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd20-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd20-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd21-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd21-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd21-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd21-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd22-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd22-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd22-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd22-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd23-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd23-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd23-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd23-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd24-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd24-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd24-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd24-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd25-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd25-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd25-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd25-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd26-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd26-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd26-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd26-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd27-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd27-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd27-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd27-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd28-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd28-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd28-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd28-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd30-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd30-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd30-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd30-snmcpeb1.mso.mci.com):  rsync: failed to open exclude file /home/esp/instance-copy-exclude: No such file or directory (2)
+rsync error: error in file IO (code 11) at exclude.c(1062) [client=3.0.6]
+*********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd31-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd31-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd31-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd31-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd32-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd32-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd32-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd32-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd33-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd33-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd33-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd33-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd34-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd34-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd34-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd34-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd35-snmcpe1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd35-snmcpe1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd35-snmcpeb1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd35-snmcpeb1.mso.mci.com):  *********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@pdcd40-gsm1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(pdcd40-gsm1.mso.mci.com):  Sun Microsystems Inc.	SunOS 5.10	Generic	January 2005
+
+     Authorized access for Verizon Business employees only
+
+
+NOTICE - PROPRIETARY SYSTEM
+This system is intended to be used solely by authorized users in the course of
+legitimate corporate business. Users are monitored to the extent necessary
+to properly administer the system, to identify unauthorized users or users
+operating beyond their proper authority, and to investigate improper access
+or use. By accessing this system, you are consenting to this monitoring.
+
+*********====================*********
+/usr/local/bin/ssh -i /home/jainswor/.ssh/id_rsa esp@ndcd40-gsm1.mso.mci.com "cd /esp; rsync -a --exclude-from=/home/esp/instance-copy-exclude snmcpe_prod_1101/ snmcpe_prod_1105"
+(ndcd40-gsm1.mso.mci.com):  Sun Microsystems Inc.	SunOS 5.10	Generic	January 2005
+
+     Authorized access for Verizon Business employees only
+
+
+NOTICE - PROPRIETARY SYSTEM
+This system is intended to be used solely by authorized users in the course of
+legitimate corporate business. Users are monitored to the extent necessary
+to properly administer the system, to identify unauthorized users or users
+operating beyond their proper authority, and to investigate improper access
+or use. By accessing this system, you are consenting to this monitoring.
+
+*********====================*********
